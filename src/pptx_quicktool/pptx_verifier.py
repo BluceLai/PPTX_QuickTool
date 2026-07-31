@@ -6,7 +6,7 @@ from pathlib import Path
 from pptx import Presentation
 
 from .page_plan import PagePlan
-from .pptx_exporter import SLIDE_HEIGHT, SLIDE_WIDTH
+from .pptx_exporter import DEFAULT_TEMPLATE_PATH, RETURN_TO_CONTENTS_TEXT, SLIDE_HEIGHT, SLIDE_WIDTH
 
 
 @dataclass(frozen=True)
@@ -18,15 +18,16 @@ class VerificationResult:
         return len(self.messages) == 0
 
 
-def verify_pptx_output(path: Path, plan: PagePlan) -> VerificationResult:
+def verify_pptx_output(path: Path, plan: PagePlan, template_path: Path | None = None) -> VerificationResult:
     try:
         presentation = Presentation(path)
     except Exception:
         return VerificationResult(messages=["Output file cannot be opened as a PPTX."])
 
     messages: list[str] = []
-    if presentation.slide_width != SLIDE_WIDTH or presentation.slide_height != SLIDE_HEIGHT:
-        messages.append("Output slide size does not match the expected 16:9 reference size.")
+    expected_width, expected_height = _expected_slide_size(template_path)
+    if presentation.slide_width != expected_width or presentation.slide_height != expected_height:
+        messages.append("Output slide size does not match the expected template size.")
 
     expected_slide_count = len(plan.pages)
     actual_slide_count = len(presentation.slides)
@@ -51,7 +52,7 @@ def _verify_required_text(presentation: Presentation, plan: PagePlan) -> list[st
                 expected = f"{entry_index}. {entry.title}"
                 if expected not in texts:
                     messages.append(f"Slide {index + 1} is missing table of contents entry: {expected}.")
-        if page.kind in {"section_start", "content"} and "Back to contents" not in texts:
+        if page.kind in {"section_start", "content"} and RETURN_TO_CONTENTS_TEXT not in texts:
             messages.append(f"Slide {index + 1} is missing the return-to-contents link text.")
     return messages
 
@@ -75,7 +76,7 @@ def _verify_navigation_links(presentation: Presentation, plan: PagePlan) -> list
     for slide_index, page in enumerate(plan.pages):
         if page.kind not in {"section_start", "content"}:
             continue
-        shape = _shape_with_text(presentation.slides[slide_index], "Back to contents")
+        shape = _shape_with_text(presentation.slides[slide_index], RETURN_TO_CONTENTS_TEXT)
         if shape is None:
             continue
         target_index = _target_slide_index(presentation, shape)
@@ -83,6 +84,14 @@ def _verify_navigation_links(presentation: Presentation, plan: PagePlan) -> list
             messages.append(f"Slide {slide_index + 1} return link points to the wrong slide.")
 
     return messages
+
+
+def _expected_slide_size(template_path: Path | None) -> tuple[int, int]:
+    path = template_path or DEFAULT_TEMPLATE_PATH
+    if path.exists():
+        presentation = Presentation(path)
+        return presentation.slide_width, presentation.slide_height
+    return SLIDE_WIDTH, SLIDE_HEIGHT
 
 
 def _slide_texts(slide) -> list[str]:

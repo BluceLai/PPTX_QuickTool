@@ -2,7 +2,7 @@
 
 PPTX QuickTool is a company-internal desktop tool for generating PowerPoint training document skeletons.
 
-The first product slice focuses on creating the project foundation. Later tickets will add the document model, PPTX page planning, generation, navigation links, and the full form workflow.
+The tool uses the built-in training document PPTX template by default. Users can also select another PPTX template file before generation. Generated files include a cover slide, table of contents, section slides, content slides, table-of-contents links, and Chinese return-to-contents links on section/content pages.
 
 ## Requirements
 

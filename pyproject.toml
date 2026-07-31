@@ -10,5 +10,8 @@ dependencies = [
 [project.scripts]
 pptx-quicktool = "pptx_quicktool.__main__:main"
 
+[tool.setuptools.package-data]
+pptx_quicktool = ["assets/*.pptx"]
+
 [tool.unittest]
 start-dir = "tests"

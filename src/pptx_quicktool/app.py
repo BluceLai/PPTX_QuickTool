@@ -7,7 +7,7 @@ from pathlib import Path
 from tkinter import filedialog, ttk
 
 from .page_plan import generate_page_plan
-from .pptx_exporter import export_page_plan_to_pptx
+from .pptx_exporter import DEFAULT_TEMPLATE_PATH, export_page_plan_to_pptx
 from .pptx_verifier import verify_pptx_output
 from .training_document import (
     SectionInput,
@@ -36,6 +36,7 @@ class TrainingDocumentForm:
         self.section_title_var = tk.StringVar()
         self.content_title_var = tk.StringVar()
         self.validation_var = tk.StringVar(value="請輸入標題並至少新增一個章節。")
+        self.template_path_var = tk.StringVar(value=str(DEFAULT_TEMPLATE_PATH))
         self.output_path_var = tk.StringVar()
         self.generation_status_var = tk.StringVar(value="請選擇輸出位置後產生 PPTX。")
 
@@ -159,7 +160,10 @@ class TrainingDocumentForm:
                 lines.append(f"{index}. {label} - {page.title}")
         return "\n".join(lines)
 
-    def generate_to_path(self, output_path: Path) -> Path | None:
+    def set_template_path(self, template_path: str | Path) -> None:
+        self.template_path_var.set(str(template_path))
+
+    def generate_to_path(self, output_path: Path, template_path: Path | None = None) -> Path | None:
         messages = self.validation_messages()
         if messages:
             self.generation_status_var.set("無法產生：" + " ".join(_localize_validation_messages(messages)))
@@ -168,12 +172,13 @@ class TrainingDocumentForm:
 
         try:
             plan = generate_page_plan(self.current_document())
-            path = export_page_plan_to_pptx(plan, output_path)
+            selected_template_path = template_path or self._selected_template_path()
+            path = export_page_plan_to_pptx(plan, output_path, template_path=selected_template_path)
         except Exception as error:
             self.generation_status_var.set(f"產生失敗：{error}")
             return None
 
-        verification = verify_pptx_output(path, plan)
+        verification = verify_pptx_output(path, plan, template_path=selected_template_path)
         if not verification.is_valid:
             self.generation_status_var.set("驗證失敗：" + " ".join(verification.messages))
             return None
@@ -273,13 +278,21 @@ class TrainingDocumentForm:
         output = ttk.Frame(right, style="App.TFrame")
         output.grid(row=3, column=0, sticky="ew", pady=(12, 0))
         output.columnconfigure(0, weight=1)
-        ttk.Entry(output, textvariable=self.output_path_var).grid(row=0, column=0, sticky="ew")
-        ttk.Button(output, text="選擇位置", command=self._choose_output_path).grid(row=0, column=1, padx=(6, 0))
+        self.template_label = ttk.Label(output, text="樣板 PPTX", style="Body.TLabel")
+        self.template_label.grid(row=0, column=0, columnspan=3, sticky="w")
+        ttk.Entry(output, textvariable=self.template_path_var).grid(row=1, column=0, sticky="ew", pady=(3, 10))
+        self.choose_template_button = ttk.Button(output, text="選擇樣板", command=self._choose_template_path)
+        self.choose_template_button.grid(row=1, column=1, padx=(6, 0), pady=(3, 10))
+
+        ttk.Label(output, text="輸出位置", style="Body.TLabel").grid(row=2, column=0, columnspan=3, sticky="w")
+        ttk.Entry(output, textvariable=self.output_path_var).grid(row=3, column=0, sticky="ew", pady=(3, 0))
+        ttk.Button(output, text="選擇位置", command=self._choose_output_path).grid(row=3, column=1, padx=(6, 0), pady=(3, 0))
         self.generate_button = ttk.Button(output, text="產生 PPTX", command=self._generate_from_output_path)
         self.generate_button.grid(
-            row=0,
+            row=3,
             column=2,
             padx=(6, 0),
+            pady=(3, 0),
         )
 
         ttk.Label(right, textvariable=self.generation_status_var, style="Status.TLabel", padding=(8, 6)).grid(
@@ -368,10 +381,23 @@ class TrainingDocumentForm:
         selection = self.content_list.curselection()
         return selection[0] if selection else None
 
+    def _selected_template_path(self) -> Path:
+        raw_path = self.template_path_var.get().strip()
+        return Path(raw_path) if raw_path else DEFAULT_TEMPLATE_PATH
+
+    def _choose_template_path(self) -> None:
+        filename = filedialog.askopenfilename(
+            parent=self.root,
+            title="選擇樣板 PPTX",
+            filetypes=[("PowerPoint files", "*.pptx")],
+        )
+        if filename:
+            self.template_path_var.set(filename)
+
     def _choose_output_path(self) -> None:
         filename = filedialog.asksaveasfilename(
             parent=self.root,
-            title="Save generated PPTX",
+            title="儲存產生的 PPTX",
             defaultextension=".pptx",
             filetypes=[("PowerPoint files", "*.pptx")],
         )

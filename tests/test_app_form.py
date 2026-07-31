@@ -145,10 +145,10 @@ class AppFormTests(unittest.TestCase):
                 [
                     ["TwinCAT Training"],
                     ["\u76ee\u9304", "1. Setup", "2. Operation"],
-                    ["Setup", "Back to contents"],
-                    ["Install Tools", "Back to contents"],
-                    ["Operation", "Back to contents"],
-                    ["Open Project", "Back to contents"],
+                    ["Setup", "回主目錄"],
+                    ["Install Tools", "回主目錄"],
+                    ["Operation", "回主目錄"],
+                    ["Open Project", "回主目錄"],
                 ],
             )
             self.assertEqual(form.generation_status_var.get(), f"\u5df2\u7522\u751f\u4e26\u9a57\u8b49\uff1a{output_path}")
@@ -206,6 +206,8 @@ class AppFormTests(unittest.TestCase):
             self.assertEqual(form.generate_button.cget("text"), "產生 PPTX")
             self.assertEqual(form.add_section_button.cget("text"), "新增章節")
             self.assertEqual(form.add_content_button.cget("text"), "新增內文頁")
+            self.assertEqual(form.template_label.cget("text"), "樣板 PPTX")
+            self.assertEqual(form.choose_template_button.cget("text"), "選擇樣板")
         finally:
             root.update()
             root.destroy()
