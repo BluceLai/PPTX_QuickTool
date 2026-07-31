@@ -67,7 +67,7 @@ def _verify_navigation_links(presentation: Presentation, plan: PagePlan) -> list
     slide_index_by_page_id = {page.page_id: index for index, page in enumerate(plan.pages)}
     table_of_contents_index = slide_index_by_page_id["table-of-contents"]
     table_of_contents_slide = presentation.slides[table_of_contents_index]
-    table_of_contents_targets = _linked_slide_indices(presentation, table_of_contents_slide)
+    table_of_contents_targets = linked_slide_indices(presentation, table_of_contents_slide)
     for entry_index, entry in enumerate(plan.table_of_contents_entries, start=1):
         expected_index = slide_index_by_page_id[entry.target_page_id]
         if expected_index not in table_of_contents_targets:
@@ -76,7 +76,7 @@ def _verify_navigation_links(presentation: Presentation, plan: PagePlan) -> list
     for slide_index, page in enumerate(plan.pages):
         if page.kind != "section_start":
             continue
-        linked_indices = _linked_slide_indices(presentation, presentation.slides[slide_index])
+        linked_indices = linked_slide_indices(presentation, presentation.slides[slide_index])
         if table_of_contents_index not in linked_indices:
             messages.append(f"Slide {slide_index + 1} return link points to the wrong slide.")
 
@@ -99,7 +99,7 @@ def _slide_text(slide) -> str:
     return "\n".join(texts)
 
 
-def _linked_slide_indices(presentation: Presentation, slide) -> list[int]:
+def linked_slide_indices(presentation: Presentation, slide) -> list[int]:
     indices = []
     for shape in slide.shapes:
         target_slide = shape.click_action.target_slide

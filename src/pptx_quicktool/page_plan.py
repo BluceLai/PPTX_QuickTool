@@ -10,6 +10,7 @@ class PlannedPage:
     page_id: str
     kind: str
     title: str
+    section_index: int | None = None
 
 
 @dataclass(frozen=True)
@@ -38,6 +39,7 @@ def generate_page_plan(document: TrainingDocumentInput) -> PagePlan:
                 page_id=section_page_id,
                 kind="section_start",
                 title=section.title,
+                section_index=section_index,
             )
         )
         table_of_contents_entries.append(
@@ -49,6 +51,7 @@ def generate_page_plan(document: TrainingDocumentInput) -> PagePlan:
                     page_id=f"section-{section_index}-content-{content_index}",
                     kind="content",
                     title=content_page_title,
+                    section_index=section_index,
                 )
             )
 

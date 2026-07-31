@@ -36,6 +36,14 @@ class TemplatePresentation:
     agenda_paragraph_styles: dict[int, object]
 
 
+@dataclass(frozen=True)
+class RenderContext:
+    plan: PagePlan
+    slide_by_page_id: dict[str, object]
+    table_of_contents_slide: object
+    agenda_paragraph_styles: dict[int, object]
+
+
 def export_page_plan_to_pptx(plan: PagePlan, output_path: Path, template_path: Path | None = None) -> Path:
     template = _new_presentation_from_template(template_path)
     presentation = template.presentation
@@ -47,15 +55,14 @@ def export_page_plan_to_pptx(plan: PagePlan, output_path: Path, template_path: P
         slide_pages.append((slide, page))
 
     table_of_contents_slide = slide_by_page_id["table-of-contents"]
+    context = RenderContext(
+        plan=plan,
+        slide_by_page_id=slide_by_page_id,
+        table_of_contents_slide=table_of_contents_slide,
+        agenda_paragraph_styles=template.agenda_paragraph_styles,
+    )
     for slide, page in slide_pages:
-        _populate_slide(
-            slide,
-            page,
-            plan,
-            slide_by_page_id,
-            table_of_contents_slide,
-            template.agenda_paragraph_styles,
-        )
+        _populate_slide(slide, page, context)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     presentation.save(output_path)
@@ -92,19 +99,12 @@ def _layout_for_page(presentation, page: PlannedPage):
     return presentation.slide_layouts[0]
 
 
-def _populate_slide(
-    slide,
-    page: PlannedPage,
-    plan: PagePlan,
-    slide_by_page_id,
-    table_of_contents_slide,
-    agenda_paragraph_styles: dict[int, object],
-) -> None:
+def _populate_slide(slide, page: PlannedPage, context: RenderContext) -> None:
     _set_title(slide, page.title)
     if page.kind == "table_of_contents":
-        _populate_table_of_contents(slide, plan, slide_by_page_id, agenda_paragraph_styles)
+        _populate_table_of_contents(slide, context)
     elif page.kind == "section_start":
-        _populate_section_agenda(slide, page, plan, table_of_contents_slide, agenda_paragraph_styles)
+        _populate_section_agenda(slide, page, context)
     elif page.kind == "content":
         _clear_body_placeholder(slide)
 
@@ -141,62 +141,56 @@ def _add_link_text(slide, text: str, left, top, width, height):
     return box
 
 
-def _populate_table_of_contents(slide, plan: PagePlan, slide_by_page_id, agenda_paragraph_styles: dict[int, object]) -> None:
+def _populate_table_of_contents(slide, context: RenderContext) -> None:
     body_shape = _placeholder(slide, PP_PLACEHOLDER.BODY)
     if body_shape is None:
-        _add_table_of_contents_text_boxes(slide, plan, slide_by_page_id)
+        _add_table_of_contents_text_boxes(slide, context.plan, context.slide_by_page_id)
         return
 
     text_frame = body_shape.text_frame
     text_frame.clear()
-    _append_agenda_line(text_frame, TABLE_OF_CONTENTS_RETURN_TEXT, paragraph_styles=agenda_paragraph_styles)
-    for entry in plan.table_of_contents_entries:
+    _append_agenda_line(text_frame, TABLE_OF_CONTENTS_RETURN_TEXT, paragraph_styles=context.agenda_paragraph_styles)
+    for entry in context.plan.table_of_contents_entries:
         run = _append_agenda_line(
             text_frame,
             entry.title,
             is_link=True,
-            paragraph_styles=agenda_paragraph_styles,
+            paragraph_styles=context.agenda_paragraph_styles,
         )
-        _link_run_to_slide(slide, run, slide_by_page_id[entry.target_page_id])
-        section_page = _page_for_id(plan, entry.target_page_id)
-        for content_title in _content_titles_for_section(plan, section_page):
-            _append_agenda_line(text_frame, content_title, level=1, paragraph_styles=agenda_paragraph_styles)
+        _link_run_to_slide(slide, run, context.slide_by_page_id[entry.target_page_id])
+        section_page = _page_for_id(context.plan, entry.target_page_id)
+        for content_title in _content_titles_for_section(context.plan, section_page):
+            _append_agenda_line(text_frame, content_title, level=1, paragraph_styles=context.agenda_paragraph_styles)
 
 
-def _populate_section_agenda(
-    slide,
-    page: PlannedPage,
-    plan: PagePlan,
-    table_of_contents_slide,
-    agenda_paragraph_styles: dict[int, object],
-) -> None:
+def _populate_section_agenda(slide, page: PlannedPage, context: RenderContext) -> None:
     body_shape = _placeholder(slide, PP_PLACEHOLDER.BODY)
     if body_shape is None:
-        _add_return_link(slide, table_of_contents_slide)
+        _add_return_link(slide, context.table_of_contents_slide)
         return
 
-    current_section_index = _section_index_from_page_id(page.page_id)
+    current_section_index = _section_index_for_page(page)
     text_frame = body_shape.text_frame
     text_frame.clear()
     run = _append_agenda_line(
         text_frame,
         TABLE_OF_CONTENTS_RETURN_TEXT,
         is_link=True,
-        paragraph_styles=agenda_paragraph_styles,
+        paragraph_styles=context.agenda_paragraph_styles,
     )
-    _link_run_to_slide(slide, run, table_of_contents_slide)
-    for entry_index, entry in enumerate(plan.table_of_contents_entries, start=1):
-        section_page = _page_for_id(plan, entry.target_page_id)
+    _link_run_to_slide(slide, run, context.table_of_contents_slide)
+    for entry_index, entry in enumerate(context.plan.table_of_contents_entries, start=1):
+        section_page = _page_for_id(context.plan, entry.target_page_id)
         run = _append_agenda_line(
             text_frame,
             entry.title,
             is_current=entry_index == current_section_index,
-            paragraph_styles=agenda_paragraph_styles,
+            paragraph_styles=context.agenda_paragraph_styles,
         )
         if entry_index == current_section_index:
             run.font.bold = True
-        for content_title in _content_titles_for_section(plan, section_page):
-            _append_agenda_line(text_frame, content_title, level=1, paragraph_styles=agenda_paragraph_styles)
+        for content_title in _content_titles_for_section(context.plan, section_page):
+            _append_agenda_line(text_frame, content_title, level=1, paragraph_styles=context.agenda_paragraph_styles)
 
 
 def _add_table_of_contents_text_boxes(slide, plan: PagePlan, slide_by_page_id) -> None:
@@ -321,13 +315,14 @@ def _page_for_id(plan: PagePlan, page_id: str) -> PlannedPage:
 
 
 def _content_titles_for_section(plan: PagePlan, section_page: PlannedPage) -> list[str]:
-    section_index = _section_index_from_page_id(section_page.page_id)
-    prefix = f"section-{section_index}-content-"
-    return [page.title for page in plan.pages if page.page_id.startswith(prefix)]
+    section_index = _section_index_for_page(section_page)
+    return [page.title for page in plan.pages if page.kind == "content" and page.section_index == section_index]
 
 
-def _section_index_from_page_id(page_id: str) -> int:
-    return int(page_id.split("-")[1])
+def _section_index_for_page(page: PlannedPage) -> int:
+    if page.section_index is None:
+        raise ValueError(f"Page does not belong to a section: {page.page_id}")
+    return page.section_index
 
 
 def _add_return_link(slide, table_of_contents_slide) -> None:

@@ -13,10 +13,10 @@ if str(SRC) not in sys.path:
 
 from pptx import Presentation
 from pptx.enum.shapes import PP_PLACEHOLDER
-from pptx.oxml.ns import qn
 
 from pptx_quicktool.page_plan import generate_page_plan
 from pptx_quicktool.pptx_exporter import DEFAULT_TEMPLATE_PATH, export_page_plan_to_pptx
+from pptx_quicktool.pptx_verifier import linked_slide_indices
 from pptx_quicktool.training_document import SectionInput, TrainingDocumentInput
 
 
@@ -57,29 +57,6 @@ def paragraph_with_text(slide, text: str):
     raise AssertionError(f"Could not find paragraph with text: {text}")
 
 
-def linked_slide_indices(presentation: Presentation, slide) -> list[int]:
-    indices = []
-    for shape in slide.shapes:
-        target_slide = shape.click_action.target_slide
-        if target_slide is not None:
-            indices.append(slide_index_for_target(presentation, target_slide))
-        for hyperlink in shape._element.xpath(".//a:rPr/a:hlinkClick"):
-            relationship_id = hyperlink.get(qn("r:id"))
-            if not relationship_id:
-                continue
-            relationship = slide.part.rels[relationship_id]
-            target_part = relationship.target_part
-            indices.append(slide_part_index(presentation, target_part))
-    return indices
-
-
-def slide_part_index(presentation: Presentation, target_part) -> int:
-    for index, candidate_slide in enumerate(presentation.slides):
-        if candidate_slide.part == target_part:
-            return index
-    raise AssertionError("Target slide part was not found in presentation")
-
-
 def placeholder_shape_with_text(slide, text: str):
     shape = shape_with_text(slide, text)
     if not shape.is_placeholder:
@@ -92,13 +69,6 @@ def title_placeholder(layout):
         if placeholder.placeholder_format.type == PP_PLACEHOLDER.TITLE:
             return placeholder
     raise AssertionError("Layout has no title placeholder")
-
-
-def slide_index_for_target(presentation: Presentation, target_slide) -> int:
-    for index, slide in enumerate(presentation.slides):
-        if slide == target_slide:
-            return index
-    raise AssertionError("Target slide was not found in presentation")
 
 
 class PptxExporterTests(unittest.TestCase):

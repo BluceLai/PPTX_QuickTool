@@ -113,6 +113,23 @@ class TrainingDocumentInputTests(unittest.TestCase):
         self.assertFalse(result.is_valid)
         self.assertEqual(result.messages, ["Section 1 content page 2 title is required."])
 
+    def test_validation_rejects_duplicate_content_page_titles_in_the_same_section(self) -> None:
+        document = TrainingDocumentInput(
+            title="TwinCAT Training",
+            sections=[
+                SectionInput(title="Setup", content_page_titles=["Install Tools", " install tools "]),
+                SectionInput(title="Operation", content_page_titles=["Install Tools"]),
+            ],
+        )
+
+        result = validate_training_document_input(document)
+
+        self.assertFalse(result.is_valid)
+        self.assertEqual(
+            result.messages,
+            ["Section 1 content page title is duplicated: Install Tools."],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
