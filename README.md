@@ -16,6 +16,8 @@ The tool uses the built-in training document PPTX template by default. Users can
 python scripts/run_app.py
 ```
 
+Chinese usage instructions are available in [`docs/user-guide.md`](docs/user-guide.md).
+
 For a non-interactive smoke run:
 
 ```powershell
