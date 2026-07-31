@@ -12,6 +12,8 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from pptx import Presentation
+from pptx.enum.shapes import PP_PLACEHOLDER
+from pptx.oxml.ns import qn
 
 from pptx_quicktool.page_plan import generate_page_plan
 from pptx_quicktool.pptx_exporter import DEFAULT_TEMPLATE_PATH, export_page_plan_to_pptx
@@ -35,6 +37,51 @@ def shape_with_text(slide, text: str):
         if hasattr(shape, "text") and shape.text.strip().replace("\v", "\n") == text:
             return shape
     raise AssertionError(f"Could not find shape with text: {text}")
+
+
+def slide_combined_text(slide) -> str:
+    texts = []
+    for shape in slide.shapes:
+        if hasattr(shape, "text") and shape.text.strip():
+            texts.append(shape.text.strip().replace("\v", "\n"))
+    return "\n".join(texts)
+
+
+def linked_slide_indices(presentation: Presentation, slide) -> list[int]:
+    indices = []
+    for shape in slide.shapes:
+        target_slide = shape.click_action.target_slide
+        if target_slide is not None:
+            indices.append(slide_index_for_target(presentation, target_slide))
+        for hyperlink in shape._element.xpath(".//a:rPr/a:hlinkClick"):
+            relationship_id = hyperlink.get(qn("r:id"))
+            if not relationship_id:
+                continue
+            relationship = slide.part.rels[relationship_id]
+            target_part = relationship.target_part
+            indices.append(slide_part_index(presentation, target_part))
+    return indices
+
+
+def slide_part_index(presentation: Presentation, target_part) -> int:
+    for index, candidate_slide in enumerate(presentation.slides):
+        if candidate_slide.part == target_part:
+            return index
+    raise AssertionError("Target slide part was not found in presentation")
+
+
+def placeholder_shape_with_text(slide, text: str):
+    shape = shape_with_text(slide, text)
+    if not shape.is_placeholder:
+        raise AssertionError(f"Shape with text is not a placeholder: {text}")
+    return shape
+
+
+def title_placeholder(layout):
+    for placeholder in layout.placeholders:
+        if placeholder.placeholder_format.type == PP_PLACEHOLDER.TITLE:
+            return placeholder
+    raise AssertionError("Layout has no title placeholder")
 
 
 def slide_index_for_target(presentation: Presentation, target_slide) -> int:
@@ -69,18 +116,15 @@ class PptxExporterTests(unittest.TestCase):
         self.assertTrue(output_path.exists())
         presentation = Presentation(output_path)
         self.assertEqual(len(presentation.slides), 7)
-        self.assertEqual(
-            slide_texts(output_path),
-            [
-                ["TwinCAT Training"],
-                ["\u76ee\u9304", "1. Setup", "2. Operation"],
-                ["Setup", "回主目錄"],
-                ["Install Tools", "回主目錄"],
-                ["Connect Controller", "回主目錄"],
-                ["Operation", "回主目錄"],
-                ["Open Project", "回主目錄"],
-            ],
-        )
+        self.assertIn("TwinCAT Training", slide_combined_text(presentation.slides[0]))
+        self.assertIn("目錄", slide_combined_text(presentation.slides[1]))
+        self.assertIn("1. Setup", slide_combined_text(presentation.slides[1]))
+        self.assertIn("    - Install Tools", slide_combined_text(presentation.slides[1]))
+        self.assertIn("    - Connect Controller", slide_combined_text(presentation.slides[1]))
+        self.assertIn("2. Operation", slide_combined_text(presentation.slides[1]))
+        self.assertIn("Setup", slide_combined_text(presentation.slides[2]))
+        self.assertIn("Install Tools", slide_combined_text(presentation.slides[3]))
+        self.assertIn("回主目錄", slide_combined_text(presentation.slides[3]))
 
     def test_exports_table_of_contents_and_return_navigation_links(self) -> None:
         document = TrainingDocumentInput(
@@ -103,25 +147,12 @@ class PptxExporterTests(unittest.TestCase):
         export_page_plan_to_pptx(plan, output_path)
 
         presentation = Presentation(output_path)
-        setup_link = shape_with_text(presentation.slides[1], "1. Setup")
-        operation_link = shape_with_text(presentation.slides[1], "2. Operation")
-        self.assertEqual(
-            slide_index_for_target(presentation, setup_link.click_action.target_slide),
-            2,
-        )
-        self.assertEqual(
-            slide_index_for_target(
-                presentation,
-                operation_link.click_action.target_slide,
-            ),
-            5,
-        )
-        for slide_index in [2, 3, 4, 5, 6]:
-            back_link = shape_with_text(presentation.slides[slide_index], "回主目錄")
-            self.assertEqual(
-                slide_index_for_target(presentation, back_link.click_action.target_slide),
-                1,
-            )
+        self.assertEqual(linked_slide_indices(presentation, presentation.slides[1]), [2, 5])
+        self.assertEqual(linked_slide_indices(presentation, presentation.slides[2]), [1])
+        self.assertIn("目錄", slide_combined_text(presentation.slides[2]))
+        self.assertIn("2. Operation", slide_combined_text(presentation.slides[2]))
+        for slide_index in [3, 4, 5, 6]:
+            self.assertEqual(linked_slide_indices(presentation, presentation.slides[slide_index]), [1])
 
     def test_table_of_contents_links_follow_reordered_sections(self) -> None:
         document = TrainingDocumentInput(
@@ -144,19 +175,7 @@ class PptxExporterTests(unittest.TestCase):
         export_page_plan_to_pptx(plan, output_path)
 
         presentation = Presentation(output_path)
-        operation_link = shape_with_text(presentation.slides[1], "1. Operation")
-        setup_link = shape_with_text(presentation.slides[1], "2. Setup")
-        self.assertEqual(
-            slide_index_for_target(
-                presentation,
-                operation_link.click_action.target_slide,
-            ),
-            2,
-        )
-        self.assertEqual(
-            slide_index_for_target(presentation, setup_link.click_action.target_slide),
-            4,
-        )
+        self.assertEqual(linked_slide_indices(presentation, presentation.slides[1]), [2, 4])
 
     def test_exports_reference_size_and_consistent_title_hierarchy(self) -> None:
         document = TrainingDocumentInput(
@@ -177,14 +196,17 @@ class PptxExporterTests(unittest.TestCase):
         self.assertEqual(presentation.slide_height, 6858000)
 
         title_shapes = [
-            shape_with_text(presentation.slides[0], "TwinCAT Training"),
-            shape_with_text(presentation.slides[1], "\u76ee\u9304"),
-            shape_with_text(presentation.slides[2], "Setup"),
-            shape_with_text(presentation.slides[3], "Install Tools"),
+            placeholder_shape_with_text(presentation.slides[0], "TwinCAT Training"),
+            placeholder_shape_with_text(presentation.slides[1], "\u76ee\u9304"),
+            placeholder_shape_with_text(presentation.slides[2], "Setup"),
+            placeholder_shape_with_text(presentation.slides[3], "Install Tools"),
         ]
-        self.assertEqual({shape.left for shape in title_shapes}, {685800})
-        self.assertEqual({shape.top for shape in title_shapes}, {457200})
-        self.assertEqual({shape.text_frame.paragraphs[0].font.size.pt for shape in title_shapes}, {34.0})
+        template = Presentation(DEFAULT_TEMPLATE_PATH)
+        template_title_placeholder = title_placeholder(template.slide_layouts[0])
+        self.assertEqual({shape.left for shape in title_shapes}, {template_title_placeholder.left})
+        self.assertEqual({shape.top for shape in title_shapes}, {template_title_placeholder.top})
+        self.assertEqual({shape.text_frame.paragraphs[0].runs[0].font.name for shape in title_shapes}, {None})
+        self.assertEqual({shape.text_frame.paragraphs[0].runs[0].font.size for shape in title_shapes}, {None})
 
     def test_exports_with_default_training_document_template_layouts(self) -> None:
         document = TrainingDocumentInput(

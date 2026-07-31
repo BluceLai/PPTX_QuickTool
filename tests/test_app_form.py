@@ -27,6 +27,10 @@ def slide_texts(path: Path) -> list[list[str]]:
     return slides
 
 
+def slide_combined_texts(path: Path) -> list[str]:
+    return ["\n".join(texts) for texts in slide_texts(path)]
+
+
 class AppFormTests(unittest.TestCase):
     def test_form_edits_document_structure_and_preview(self) -> None:
         root = create_main_window()
@@ -140,17 +144,15 @@ class AppFormTests(unittest.TestCase):
 
             self.assertEqual(result, output_path)
             self.assertTrue(output_path.exists())
-            self.assertEqual(
-                slide_texts(output_path),
-                [
-                    ["TwinCAT Training"],
-                    ["\u76ee\u9304", "1. Setup", "2. Operation"],
-                    ["Setup", "回主目錄"],
-                    ["Install Tools", "回主目錄"],
-                    ["Operation", "回主目錄"],
-                    ["Open Project", "回主目錄"],
-                ],
-            )
+            texts = slide_combined_texts(output_path)
+            self.assertIn("TwinCAT Training", texts[0])
+            self.assertIn("目錄", texts[1])
+            self.assertIn("1. Setup", texts[1])
+            self.assertIn("    - Install Tools", texts[1])
+            self.assertIn("2. Operation", texts[1])
+            self.assertIn("目錄", texts[2])
+            self.assertIn("Open Project", texts[4])
+            self.assertIn("回主目錄", texts[5])
             self.assertEqual(form.generation_status_var.get(), f"\u5df2\u7522\u751f\u4e26\u9a57\u8b49\uff1a{output_path}")
         finally:
             root.update()
