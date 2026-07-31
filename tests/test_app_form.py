@@ -204,6 +204,8 @@ class AppFormTests(unittest.TestCase):
             self.assertEqual(form.content_pages_label.cget("text"), "選取章節的內文頁")
             self.assertEqual(form.preview_label.cget("text"), "投影片預覽")
             self.assertEqual(form.generate_button.cget("text"), "產生 PPTX")
+            self.assertEqual(form.add_section_button.cget("text"), "新增章節")
+            self.assertEqual(form.add_content_button.cget("text"), "新增內文頁")
         finally:
             root.update()
             root.destroy()
@@ -228,6 +230,32 @@ class AppFormTests(unittest.TestCase):
                 form.content_pages_label.winfo_rootx() + form.content_pages_label.winfo_width(),
                 left_right_edge,
             )
+        finally:
+            root.update()
+            root.destroy()
+
+    def test_form_add_buttons_remain_visible_at_reported_window_size(self) -> None:
+        root = create_main_window()
+        try:
+            root.geometry("900x650")
+            form = root.form
+            form.set_document_title("這是測試文件")
+            form.add_section("一")
+            form.add_section("二")
+            form.add_section("三")
+            root.update()
+
+            left_x = form.left_panel.winfo_rootx()
+            left_right_edge = left_x + form.left_panel.winfo_width()
+
+            for button in (form.add_section_button, form.add_content_button):
+                button_left = button.winfo_rootx()
+                button_right = button_left + button.winfo_width()
+
+                self.assertGreaterEqual(button.winfo_width(), 120)
+                self.assertGreaterEqual(button.winfo_height(), 20)
+                self.assertGreaterEqual(button_left, left_x)
+                self.assertLessEqual(button_right, left_right_edge)
         finally:
             root.update()
             root.destroy()

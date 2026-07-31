@@ -227,12 +227,18 @@ class TrainingDocumentForm:
         section_controls = ttk.Frame(left, style="App.TFrame")
         section_controls.grid(row=4, column=0, sticky="ew", pady=(8, 12))
         section_controls.columnconfigure(0, weight=1)
-        ttk.Entry(section_controls, textvariable=self.section_title_var).grid(row=0, column=0, columnspan=5, sticky="ew")
-        ttk.Button(section_controls, text="新增", command=self._add_section_from_entry).grid(row=1, column=0, sticky="ew", pady=(6, 0))
-        ttk.Button(section_controls, text="改名", command=self._rename_section_from_entry).grid(row=1, column=1, sticky="ew", padx=(6, 0), pady=(6, 0))
-        ttk.Button(section_controls, text="刪除", command=self.remove_selected_section).grid(row=1, column=2, sticky="ew", padx=(6, 0), pady=(6, 0))
-        ttk.Button(section_controls, text="上移", command=self.move_selected_section_up).grid(row=1, column=3, sticky="ew", padx=(6, 0), pady=(6, 0))
-        ttk.Button(section_controls, text="下移", command=self.move_selected_section_down).grid(row=1, column=4, sticky="ew", padx=(6, 0), pady=(6, 0))
+        section_controls.columnconfigure(1, weight=1)
+        ttk.Entry(section_controls, textvariable=self.section_title_var).grid(row=0, column=0, columnspan=2, sticky="ew")
+        self.add_section_button = ttk.Button(
+            section_controls,
+            text="新增章節",
+            command=self._add_section_from_entry,
+        )
+        self.add_section_button.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(6, 0))
+        ttk.Button(section_controls, text="改名", command=self._rename_section_from_entry).grid(row=2, column=0, sticky="ew", pady=(6, 0))
+        ttk.Button(section_controls, text="刪除", command=self.remove_selected_section).grid(row=2, column=1, sticky="ew", padx=(6, 0), pady=(6, 0))
+        ttk.Button(section_controls, text="上移", command=self.move_selected_section_up).grid(row=3, column=0, sticky="ew", pady=(6, 0))
+        ttk.Button(section_controls, text="下移", command=self.move_selected_section_down).grid(row=3, column=1, sticky="ew", padx=(6, 0), pady=(6, 0))
 
         self.content_pages_label = ttk.Label(left, text="選取章節的內文頁", style="Body.TLabel")
         self.content_pages_label.grid(row=5, column=0, sticky="w")
@@ -242,12 +248,18 @@ class TrainingDocumentForm:
         content_controls = ttk.Frame(left, style="App.TFrame")
         content_controls.grid(row=8, column=0, sticky="ew", pady=(8, 0))
         content_controls.columnconfigure(0, weight=1)
-        ttk.Entry(content_controls, textvariable=self.content_title_var).grid(row=0, column=0, columnspan=5, sticky="ew")
-        ttk.Button(content_controls, text="新增", command=self._add_content_from_entry).grid(row=1, column=0, sticky="ew", pady=(6, 0))
-        ttk.Button(content_controls, text="改名", command=self._rename_content_from_entry).grid(row=1, column=1, sticky="ew", padx=(6, 0), pady=(6, 0))
-        ttk.Button(content_controls, text="刪除", command=self._remove_selected_content).grid(row=1, column=2, sticky="ew", padx=(6, 0), pady=(6, 0))
-        ttk.Button(content_controls, text="上移", command=self._move_selected_content_up).grid(row=1, column=3, sticky="ew", padx=(6, 0), pady=(6, 0))
-        ttk.Button(content_controls, text="下移", command=self._move_selected_content_down).grid(row=1, column=4, sticky="ew", padx=(6, 0), pady=(6, 0))
+        content_controls.columnconfigure(1, weight=1)
+        ttk.Entry(content_controls, textvariable=self.content_title_var).grid(row=0, column=0, columnspan=2, sticky="ew")
+        self.add_content_button = ttk.Button(
+            content_controls,
+            text="新增內文頁",
+            command=self._add_content_from_entry,
+        )
+        self.add_content_button.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(6, 0))
+        ttk.Button(content_controls, text="改名", command=self._rename_content_from_entry).grid(row=2, column=0, sticky="ew", pady=(6, 0))
+        ttk.Button(content_controls, text="刪除", command=self._remove_selected_content).grid(row=2, column=1, sticky="ew", padx=(6, 0), pady=(6, 0))
+        ttk.Button(content_controls, text="上移", command=self._move_selected_content_up).grid(row=3, column=0, sticky="ew", pady=(6, 0))
+        ttk.Button(content_controls, text="下移", command=self._move_selected_content_down).grid(row=3, column=1, sticky="ew", padx=(6, 0), pady=(6, 0))
 
         self.preview_label = ttk.Label(right, text="投影片預覽", style="Body.TLabel")
         self.preview_label.grid(row=0, column=0, sticky="w")
