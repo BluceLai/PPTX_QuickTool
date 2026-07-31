@@ -42,13 +42,13 @@ def _populate_slide(slide, page: PlannedPage, plan: PagePlan, slide_by_page_id, 
 
 
 def _add_title(slide, text: str) -> None:
-    box = slide.shapes.add_textbox(Inches(0.8), Inches(0.55), Inches(11.8), Inches(0.75))
+    box = slide.shapes.add_textbox(Inches(0.75), Inches(0.5), Inches(11.8), Inches(0.75))
     text_frame = box.text_frame
     text_frame.clear()
     paragraph = text_frame.paragraphs[0]
     paragraph.text = text
     paragraph.font.name = "Segoe UI"
-    paragraph.font.size = Pt(32)
+    paragraph.font.size = Pt(34)
     paragraph.font.bold = True
 
 

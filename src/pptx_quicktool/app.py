@@ -7,6 +7,7 @@ from tkinter import filedialog, ttk
 
 from .page_plan import generate_page_plan
 from .pptx_exporter import export_page_plan_to_pptx
+from .pptx_verifier import verify_pptx_output
 from .training_document import (
     SectionInput,
     TrainingDocumentInput,
@@ -165,13 +166,19 @@ class TrainingDocumentForm:
             return None
 
         try:
-            path = export_page_plan_to_pptx(generate_page_plan(self.current_document()), output_path)
+            plan = generate_page_plan(self.current_document())
+            path = export_page_plan_to_pptx(plan, output_path)
         except Exception as error:
             self.generation_status_var.set(f"Generation failed: {error}")
             return None
 
+        verification = verify_pptx_output(path, plan)
+        if not verification.is_valid:
+            self.generation_status_var.set("Verification failed: " + " ".join(verification.messages))
+            return None
+
         self.output_path_var.set(str(path))
-        self.generation_status_var.set(f"Generated: {path}")
+        self.generation_status_var.set(f"Generated and verified: {path}")
         return path
 
     def _build(self) -> None:

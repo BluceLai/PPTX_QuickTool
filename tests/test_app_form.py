@@ -151,7 +151,7 @@ class AppFormTests(unittest.TestCase):
                     ["Open Project", "Back to contents"],
                 ],
             )
-            self.assertEqual(form.generation_status_var.get(), f"Generated: {output_path}")
+            self.assertEqual(form.generation_status_var.get(), f"Generated and verified: {output_path}")
         finally:
             root.update()
             root.destroy()

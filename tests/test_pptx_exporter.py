@@ -158,6 +158,34 @@ class PptxExporterTests(unittest.TestCase):
             4,
         )
 
+    def test_exports_reference_size_and_consistent_title_hierarchy(self) -> None:
+        document = TrainingDocumentInput(
+            title="TwinCAT Training",
+            sections=[
+                SectionInput(title="Setup", content_page_titles=["Install Tools"]),
+                SectionInput(title="Operation", content_page_titles=["Open Project"]),
+            ],
+        )
+        plan = generate_page_plan(document)
+        output_dir = ROOT / ".tmp" / "test-output"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / "training-document-format.pptx"
+        export_page_plan_to_pptx(plan, output_path)
+
+        presentation = Presentation(output_path)
+        self.assertEqual(presentation.slide_width, 12192000)
+        self.assertEqual(presentation.slide_height, 6858000)
+
+        title_shapes = [
+            shape_with_text(presentation.slides[0], "TwinCAT Training"),
+            shape_with_text(presentation.slides[1], "\u76ee\u9304"),
+            shape_with_text(presentation.slides[2], "Setup"),
+            shape_with_text(presentation.slides[3], "Install Tools"),
+        ]
+        self.assertEqual({shape.left for shape in title_shapes}, {685800})
+        self.assertEqual({shape.top for shape in title_shapes}, {457200})
+        self.assertEqual({shape.text_frame.paragraphs[0].font.size.pt for shape in title_shapes}, {34.0})
+
 
 if __name__ == "__main__":
     unittest.main()
