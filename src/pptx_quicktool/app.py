@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import tkinter as tk
 from dataclasses import dataclass, field
-from tkinter import ttk
+from pathlib import Path
+from tkinter import filedialog, ttk
 
 from .page_plan import generate_page_plan
+from .pptx_exporter import export_page_plan_to_pptx
 from .training_document import (
     SectionInput,
     TrainingDocumentInput,
@@ -32,6 +34,8 @@ class TrainingDocumentForm:
         self.section_title_var = tk.StringVar()
         self.content_title_var = tk.StringVar()
         self.validation_var = tk.StringVar(value="Add a title and at least one section.")
+        self.output_path_var = tk.StringVar()
+        self.generation_status_var = tk.StringVar(value="Choose an output path to generate a PPTX.")
 
         self._build()
         self._refresh()
@@ -153,6 +157,23 @@ class TrainingDocumentForm:
                 lines.append(f"{index}. {label} - {page.title}")
         return "\n".join(lines)
 
+    def generate_to_path(self, output_path: Path) -> Path | None:
+        messages = self.validation_messages()
+        if messages:
+            self.generation_status_var.set("Cannot generate: " + " ".join(messages))
+            self._refresh()
+            return None
+
+        try:
+            path = export_page_plan_to_pptx(generate_page_plan(self.current_document()), output_path)
+        except Exception as error:
+            self.generation_status_var.set(f"Generation failed: {error}")
+            return None
+
+        self.output_path_var.set(str(path))
+        self.generation_status_var.set(f"Generated: {path}")
+        return path
+
     def _build(self) -> None:
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
@@ -221,6 +242,24 @@ class TrainingDocumentForm:
 
         self.validation_label = ttk.Label(right, textvariable=self.validation_var, style="Status.TLabel", padding=(8, 6))
         self.validation_label.grid(row=2, column=0, sticky="ew")
+
+        output = ttk.Frame(right, style="App.TFrame")
+        output.grid(row=3, column=0, sticky="ew", pady=(12, 0))
+        output.columnconfigure(0, weight=1)
+        ttk.Entry(output, textvariable=self.output_path_var).grid(row=0, column=0, sticky="ew")
+        ttk.Button(output, text="Choose", command=self._choose_output_path).grid(row=0, column=1, padx=(6, 0))
+        ttk.Button(output, text="Generate PPTX", command=self._generate_from_output_path).grid(
+            row=0,
+            column=2,
+            padx=(6, 0),
+        )
+
+        ttk.Label(right, textvariable=self.generation_status_var, style="Status.TLabel", padding=(8, 6)).grid(
+            row=4,
+            column=0,
+            sticky="ew",
+            pady=(8, 0),
+        )
 
     def _refresh(self) -> None:
         if hasattr(self, "section_list"):
@@ -300,6 +339,23 @@ class TrainingDocumentForm:
     def _selected_content_index(self) -> int | None:
         selection = self.content_list.curselection()
         return selection[0] if selection else None
+
+    def _choose_output_path(self) -> None:
+        filename = filedialog.asksaveasfilename(
+            parent=self.root,
+            title="Save generated PPTX",
+            defaultextension=".pptx",
+            filetypes=[("PowerPoint files", "*.pptx")],
+        )
+        if filename:
+            self.output_path_var.set(filename)
+
+    def _generate_from_output_path(self) -> None:
+        raw_path = self.output_path_var.get().strip()
+        if not raw_path:
+            self.generation_status_var.set("Choose an output path before generating.")
+            return
+        self.generate_to_path(Path(raw_path))
 
 
 def create_main_window() -> tk.Tk:

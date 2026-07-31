@@ -12,6 +12,19 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from pptx_quicktool.app import create_main_window
+from pptx import Presentation
+
+
+def slide_texts(path: Path) -> list[list[str]]:
+    presentation = Presentation(path)
+    slides: list[list[str]] = []
+    for slide in presentation.slides:
+        texts = []
+        for shape in slide.shapes:
+            if hasattr(shape, "text") and shape.text.strip():
+                texts.append(shape.text.strip().replace("\v", "\n"))
+        slides.append(texts)
+    return slides
 
 
 class AppFormTests(unittest.TestCase):
@@ -103,6 +116,79 @@ class AppFormTests(unittest.TestCase):
                 ),
             )
             self.assertEqual(form.preview_text(), "")
+        finally:
+            root.update()
+            root.destroy()
+
+    def test_form_generates_pptx_from_current_data(self) -> None:
+        root = create_main_window()
+        try:
+            form = root.form
+            form.set_document_title("TwinCAT Training")
+            form.add_section("Setup")
+            form.add_content_page("Install Tools")
+            form.add_section("Operation")
+            form.add_content_page("Open Project")
+
+            output_dir = ROOT / ".tmp" / "test-output"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            output_path = output_dir / "ui-generated.pptx"
+            if output_path.exists():
+                output_path.unlink()
+
+            result = form.generate_to_path(output_path)
+
+            self.assertEqual(result, output_path)
+            self.assertTrue(output_path.exists())
+            self.assertEqual(
+                slide_texts(output_path),
+                [
+                    ["TwinCAT Training"],
+                    ["\u76ee\u9304", "1. Setup", "2. Operation"],
+                    ["Setup", "Back to contents"],
+                    ["Install Tools", "Back to contents"],
+                    ["Operation", "Back to contents"],
+                    ["Open Project", "Back to contents"],
+                ],
+            )
+            self.assertEqual(form.generation_status_var.get(), f"Generated: {output_path}")
+        finally:
+            root.update()
+            root.destroy()
+
+    def test_form_blocks_generation_when_validation_fails(self) -> None:
+        root = create_main_window()
+        try:
+            form = root.form
+            output_dir = ROOT / ".tmp" / "test-output"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            output_path = output_dir / "invalid-ui-generated.pptx"
+            if output_path.exists():
+                output_path.unlink()
+
+            result = form.generate_to_path(output_path)
+
+            self.assertIsNone(result)
+            self.assertFalse(output_path.exists())
+            self.assertIn("Document title is required.", form.generation_status_var.get())
+        finally:
+            root.update()
+            root.destroy()
+
+    def test_form_reports_generation_errors(self) -> None:
+        root = create_main_window()
+        try:
+            form = root.form
+            form.set_document_title("TwinCAT Training")
+            form.add_section("Setup")
+            form.add_content_page("Install Tools")
+            output_dir = ROOT / ".tmp" / "test-output"
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            result = form.generate_to_path(output_dir)
+
+            self.assertIsNone(result)
+            self.assertTrue(form.generation_status_var.get().startswith("Generation failed:"))
         finally:
             root.update()
             root.destroy()
