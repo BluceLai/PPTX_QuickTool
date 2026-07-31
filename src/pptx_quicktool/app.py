@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import tkinter as tk
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from tkinter import filedialog, ttk
@@ -34,9 +35,9 @@ class TrainingDocumentForm:
         self.title_var = tk.StringVar()
         self.section_title_var = tk.StringVar()
         self.content_title_var = tk.StringVar()
-        self.validation_var = tk.StringVar(value="Add a title and at least one section.")
+        self.validation_var = tk.StringVar(value="請輸入標題並至少新增一個章節。")
         self.output_path_var = tk.StringVar()
-        self.generation_status_var = tk.StringVar(value="Choose an output path to generate a PPTX.")
+        self.generation_status_var = tk.StringVar(value="請選擇輸出位置後產生 PPTX。")
 
         self._build()
         self._refresh()
@@ -144,10 +145,10 @@ class TrainingDocumentForm:
             return ""
         plan = generate_page_plan(document)
         labels = {
-            "cover": "Cover",
-            "table_of_contents": "Table of contents",
-            "section_start": "Section",
-            "content": "Content",
+            "cover": "封面",
+            "table_of_contents": "目錄",
+            "section_start": "章節",
+            "content": "內文",
         }
         lines = []
         for index, page in enumerate(plan.pages, start=1):
@@ -161,7 +162,7 @@ class TrainingDocumentForm:
     def generate_to_path(self, output_path: Path) -> Path | None:
         messages = self.validation_messages()
         if messages:
-            self.generation_status_var.set("Cannot generate: " + " ".join(messages))
+            self.generation_status_var.set("無法產生：" + " ".join(_localize_validation_messages(messages)))
             self._refresh()
             return None
 
@@ -169,16 +170,16 @@ class TrainingDocumentForm:
             plan = generate_page_plan(self.current_document())
             path = export_page_plan_to_pptx(plan, output_path)
         except Exception as error:
-            self.generation_status_var.set(f"Generation failed: {error}")
+            self.generation_status_var.set(f"產生失敗：{error}")
             return None
 
         verification = verify_pptx_output(path, plan)
         if not verification.is_valid:
-            self.generation_status_var.set("Verification failed: " + " ".join(verification.messages))
+            self.generation_status_var.set("驗證失敗：" + " ".join(verification.messages))
             return None
 
         self.output_path_var.set(str(path))
-        self.generation_status_var.set(f"Generated and verified: {path}")
+        self.generation_status_var.set(f"已產生並驗證：{path}")
         return path
 
     def _build(self) -> None:
@@ -187,33 +188,38 @@ class TrainingDocumentForm:
 
         frame = ttk.Frame(self.root, padding=18, style="App.TFrame")
         frame.grid(row=0, column=0, sticky="nsew")
-        frame.columnconfigure(0, weight=1)
+        frame.columnconfigure(0, weight=0, minsize=360)
         frame.columnconfigure(1, weight=1)
         frame.rowconfigure(2, weight=1)
 
         ttk.Label(frame, text=APP_TITLE, style="Header.TLabel").grid(row=0, column=0, columnspan=2, sticky="w")
-        ttk.Label(
+        self.subtitle_label = ttk.Label(
             frame,
-            text="Create a training document structure before generating the PPTX.",
+            text="建立教學文件架構後，再產生 PPTX 初稿。",
             style="Body.TLabel",
-        ).grid(row=1, column=0, columnspan=2, sticky="w", pady=(4, 14))
+        )
+        self.subtitle_label.grid(row=1, column=0, columnspan=2, sticky="w", pady=(4, 14))
 
-        left = ttk.Frame(frame, style="App.TFrame")
-        left.grid(row=2, column=0, sticky="nsew", padx=(0, 10))
+        left = ttk.Frame(frame, width=360, style="App.TFrame")
+        self.left_panel = left
+        left.grid(row=2, column=0, sticky="nsew", padx=(0, 14))
+        left.grid_propagate(False)
         left.columnconfigure(0, weight=1)
         left.rowconfigure(3, weight=1)
         left.rowconfigure(7, weight=1)
 
         right = ttk.Frame(frame, style="App.TFrame")
-        right.grid(row=2, column=1, sticky="nsew", padx=(10, 0))
+        right.grid(row=2, column=1, sticky="nsew", padx=(14, 0))
         right.columnconfigure(0, weight=1)
         right.rowconfigure(1, weight=1)
 
-        ttk.Label(left, text="PPT title", style="Body.TLabel").grid(row=0, column=0, sticky="w")
+        self.title_label = ttk.Label(left, text="PPT 標題", style="Body.TLabel")
+        self.title_label.grid(row=0, column=0, sticky="w")
         ttk.Entry(left, textvariable=self.title_var).grid(row=1, column=0, sticky="ew", pady=(3, 12))
         self.title_var.trace_add("write", lambda *_: self._refresh())
 
-        ttk.Label(left, text="Sections", style="Body.TLabel").grid(row=2, column=0, sticky="w")
+        self.sections_label = ttk.Label(left, text="章節", style="Body.TLabel")
+        self.sections_label.grid(row=2, column=0, sticky="w")
         self.section_list = tk.Listbox(left, height=8, exportselection=False)
         self.section_list.grid(row=3, column=0, sticky="nsew")
         self.section_list.bind("<<ListboxSelect>>", self._on_section_selected)
@@ -221,28 +227,30 @@ class TrainingDocumentForm:
         section_controls = ttk.Frame(left, style="App.TFrame")
         section_controls.grid(row=4, column=0, sticky="ew", pady=(8, 12))
         section_controls.columnconfigure(0, weight=1)
-        ttk.Entry(section_controls, textvariable=self.section_title_var).grid(row=0, column=0, sticky="ew")
-        ttk.Button(section_controls, text="Add", command=self._add_section_from_entry).grid(row=0, column=1, padx=(6, 0))
-        ttk.Button(section_controls, text="Rename", command=self._rename_section_from_entry).grid(row=0, column=2, padx=(6, 0))
-        ttk.Button(section_controls, text="Remove", command=self.remove_selected_section).grid(row=0, column=3, padx=(6, 0))
-        ttk.Button(section_controls, text="Up", command=self.move_selected_section_up).grid(row=1, column=1, padx=(6, 0), pady=(6, 0))
-        ttk.Button(section_controls, text="Down", command=self.move_selected_section_down).grid(row=1, column=2, padx=(6, 0), pady=(6, 0))
+        ttk.Entry(section_controls, textvariable=self.section_title_var).grid(row=0, column=0, columnspan=5, sticky="ew")
+        ttk.Button(section_controls, text="新增", command=self._add_section_from_entry).grid(row=1, column=0, sticky="ew", pady=(6, 0))
+        ttk.Button(section_controls, text="改名", command=self._rename_section_from_entry).grid(row=1, column=1, sticky="ew", padx=(6, 0), pady=(6, 0))
+        ttk.Button(section_controls, text="刪除", command=self.remove_selected_section).grid(row=1, column=2, sticky="ew", padx=(6, 0), pady=(6, 0))
+        ttk.Button(section_controls, text="上移", command=self.move_selected_section_up).grid(row=1, column=3, sticky="ew", padx=(6, 0), pady=(6, 0))
+        ttk.Button(section_controls, text="下移", command=self.move_selected_section_down).grid(row=1, column=4, sticky="ew", padx=(6, 0), pady=(6, 0))
 
-        ttk.Label(left, text="Content pages in selected section", style="Body.TLabel").grid(row=5, column=0, sticky="w")
+        self.content_pages_label = ttk.Label(left, text="選取章節的內文頁", style="Body.TLabel")
+        self.content_pages_label.grid(row=5, column=0, sticky="w")
         self.content_list = tk.Listbox(left, height=7, exportselection=False)
         self.content_list.grid(row=7, column=0, sticky="nsew")
 
         content_controls = ttk.Frame(left, style="App.TFrame")
         content_controls.grid(row=8, column=0, sticky="ew", pady=(8, 0))
         content_controls.columnconfigure(0, weight=1)
-        ttk.Entry(content_controls, textvariable=self.content_title_var).grid(row=0, column=0, sticky="ew")
-        ttk.Button(content_controls, text="Add", command=self._add_content_from_entry).grid(row=0, column=1, padx=(6, 0))
-        ttk.Button(content_controls, text="Rename", command=self._rename_content_from_entry).grid(row=0, column=2, padx=(6, 0))
-        ttk.Button(content_controls, text="Remove", command=self._remove_selected_content).grid(row=0, column=3, padx=(6, 0))
-        ttk.Button(content_controls, text="Up", command=self._move_selected_content_up).grid(row=1, column=1, padx=(6, 0), pady=(6, 0))
-        ttk.Button(content_controls, text="Down", command=self._move_selected_content_down).grid(row=1, column=2, padx=(6, 0), pady=(6, 0))
+        ttk.Entry(content_controls, textvariable=self.content_title_var).grid(row=0, column=0, columnspan=5, sticky="ew")
+        ttk.Button(content_controls, text="新增", command=self._add_content_from_entry).grid(row=1, column=0, sticky="ew", pady=(6, 0))
+        ttk.Button(content_controls, text="改名", command=self._rename_content_from_entry).grid(row=1, column=1, sticky="ew", padx=(6, 0), pady=(6, 0))
+        ttk.Button(content_controls, text="刪除", command=self._remove_selected_content).grid(row=1, column=2, sticky="ew", padx=(6, 0), pady=(6, 0))
+        ttk.Button(content_controls, text="上移", command=self._move_selected_content_up).grid(row=1, column=3, sticky="ew", padx=(6, 0), pady=(6, 0))
+        ttk.Button(content_controls, text="下移", command=self._move_selected_content_down).grid(row=1, column=4, sticky="ew", padx=(6, 0), pady=(6, 0))
 
-        ttk.Label(right, text="Slide preview", style="Body.TLabel").grid(row=0, column=0, sticky="w")
+        self.preview_label = ttk.Label(right, text="投影片預覽", style="Body.TLabel")
+        self.preview_label.grid(row=0, column=0, sticky="w")
         self.preview = tk.Text(right, height=20, wrap="word", borderwidth=1, relief="solid")
         self.preview.grid(row=1, column=0, sticky="nsew", pady=(3, 12))
         self.preview.configure(state="disabled")
@@ -254,8 +262,9 @@ class TrainingDocumentForm:
         output.grid(row=3, column=0, sticky="ew", pady=(12, 0))
         output.columnconfigure(0, weight=1)
         ttk.Entry(output, textvariable=self.output_path_var).grid(row=0, column=0, sticky="ew")
-        ttk.Button(output, text="Choose", command=self._choose_output_path).grid(row=0, column=1, padx=(6, 0))
-        ttk.Button(output, text="Generate PPTX", command=self._generate_from_output_path).grid(
+        ttk.Button(output, text="選擇位置", command=self._choose_output_path).grid(row=0, column=1, padx=(6, 0))
+        self.generate_button = ttk.Button(output, text="產生 PPTX", command=self._generate_from_output_path)
+        self.generate_button.grid(
             row=0,
             column=2,
             padx=(6, 0),
@@ -292,7 +301,7 @@ class TrainingDocumentForm:
 
     def _refresh_preview_and_validation(self) -> None:
         messages = self.validation_messages()
-        self.validation_var.set("Ready" if not messages else " ".join(messages))
+        self.validation_var.set("就緒" if not messages else " ".join(_localize_validation_messages(messages)))
         self.preview.configure(state="normal")
         self.preview.delete("1.0", tk.END)
         preview = self.preview_text()
@@ -360,7 +369,7 @@ class TrainingDocumentForm:
     def _generate_from_output_path(self) -> None:
         raw_path = self.output_path_var.get().strip()
         if not raw_path:
-            self.generation_status_var.set("Choose an output path before generating.")
+            self.generation_status_var.set("請先選擇輸出位置。")
             return
         self.generate_to_path(Path(raw_path))
 
@@ -383,3 +392,28 @@ def _configure_styles(root: tk.Tk) -> None:
     style.configure("Header.TLabel", background="#f5f6f8", font=("Segoe UI", 18, "bold"))
     style.configure("Body.TLabel", background="#f5f6f8", font=("Segoe UI", 10))
     style.configure("Status.TLabel", background="#eef1f5", font=("Segoe UI", 9))
+
+
+def _localize_validation_messages(messages: list[str]) -> list[str]:
+    return [_localize_validation_message(message) for message in messages]
+
+
+def _localize_validation_message(message: str) -> str:
+    if message == "Document title is required.":
+        return "請輸入 PPT 標題。"
+    if message == "At least one section is required.":
+        return "請至少新增一個章節。"
+
+    match = re.fullmatch(r"Section (\d+) title is required\.", message)
+    if match:
+        return f"第 {match.group(1)} 個章節需要標題。"
+
+    match = re.fullmatch(r"Section (\d+) must include at least one content page\.", message)
+    if match:
+        return f"第 {match.group(1)} 個章節至少需要一個內文頁。"
+
+    match = re.fullmatch(r"Section (\d+) content page (\d+) title is required\.", message)
+    if match:
+        return f"第 {match.group(1)} 個章節的第 {match.group(2)} 個內文頁需要標題。"
+
+    return message

@@ -49,13 +49,13 @@ class AppFormTests(unittest.TestCase):
             self.assertEqual(
                 form.preview_text(),
                 (
-                    "1. Cover - TwinCAT Training\n"
-                    "2. Table of contents\n"
-                    "3. Section - Setup\n"
-                    "4. Content - Install Tools\n"
-                    "5. Content - Connect Controller\n"
-                    "6. Section - Operation\n"
-                    "7. Content - Open Project"
+                    "1. \u5c01\u9762 - TwinCAT Training\n"
+                    "2. \u76ee\u9304\n"
+                    "3. \u7ae0\u7bc0 - Setup\n"
+                    "4. \u5167\u6587 - Install Tools\n"
+                    "5. \u5167\u6587 - Connect Controller\n"
+                    "6. \u7ae0\u7bc0 - Operation\n"
+                    "7. \u5167\u6587 - Open Project"
                 ),
             )
         finally:
@@ -110,9 +110,9 @@ class AppFormTests(unittest.TestCase):
             self.assertEqual(
                 form.validation_var.get(),
                 (
-                    "Document title is required. "
-                    "Section 1 title is required. "
-                    "Section 1 must include at least one content page."
+                    "\u8acb\u8f38\u5165 PPT \u6a19\u984c\u3002 "
+                    "\u7b2c 1 \u500b\u7ae0\u7bc0\u9700\u8981\u6a19\u984c\u3002 "
+                    "\u7b2c 1 \u500b\u7ae0\u7bc0\u81f3\u5c11\u9700\u8981\u4e00\u500b\u5167\u6587\u9801\u3002"
                 ),
             )
             self.assertEqual(form.preview_text(), "")
@@ -151,7 +151,7 @@ class AppFormTests(unittest.TestCase):
                     ["Open Project", "Back to contents"],
                 ],
             )
-            self.assertEqual(form.generation_status_var.get(), f"Generated and verified: {output_path}")
+            self.assertEqual(form.generation_status_var.get(), f"\u5df2\u7522\u751f\u4e26\u9a57\u8b49\uff1a{output_path}")
         finally:
             root.update()
             root.destroy()
@@ -170,7 +170,7 @@ class AppFormTests(unittest.TestCase):
 
             self.assertIsNone(result)
             self.assertFalse(output_path.exists())
-            self.assertIn("Document title is required.", form.generation_status_var.get())
+            self.assertIn("\u8acb\u8f38\u5165 PPT \u6a19\u984c\u3002", form.generation_status_var.get())
         finally:
             root.update()
             root.destroy()
@@ -188,7 +188,46 @@ class AppFormTests(unittest.TestCase):
             result = form.generate_to_path(output_dir)
 
             self.assertIsNone(result)
-            self.assertTrue(form.generation_status_var.get().startswith("Generation failed:"))
+            self.assertTrue(form.generation_status_var.get().startswith("\u7522\u751f\u5931\u6557\uff1a"))
+        finally:
+            root.update()
+            root.destroy()
+
+    def test_form_uses_chinese_labels(self) -> None:
+        root = create_main_window()
+        try:
+            form = root.form
+
+            self.assertIn("建立教學文件架構", form.subtitle_label.cget("text"))
+            self.assertEqual(form.title_label.cget("text"), "PPT 標題")
+            self.assertEqual(form.sections_label.cget("text"), "章節")
+            self.assertEqual(form.content_pages_label.cget("text"), "選取章節的內文頁")
+            self.assertEqual(form.preview_label.cget("text"), "投影片預覽")
+            self.assertEqual(form.generate_button.cget("text"), "產生 PPTX")
+        finally:
+            root.update()
+            root.destroy()
+
+    def test_form_left_controls_do_not_overlap_preview(self) -> None:
+        root = create_main_window()
+        try:
+            root.geometry("900x650")
+            form = root.form
+            form.set_document_title("這是測試文件")
+            form.add_section("一")
+            form.add_section("二")
+            form.add_section("三")
+            root.update()
+
+            left_right_edge = form.left_panel.winfo_rootx() + form.left_panel.winfo_width()
+            preview_left_edge = form.preview.winfo_rootx()
+
+            self.assertGreaterEqual(form.left_panel.winfo_width(), 340)
+            self.assertLessEqual(left_right_edge + 8, preview_left_edge)
+            self.assertLessEqual(
+                form.content_pages_label.winfo_rootx() + form.content_pages_label.winfo_width(),
+                left_right_edge,
+            )
         finally:
             root.update()
             root.destroy()
