@@ -33,8 +33,6 @@ def validate_training_document_input(document: TrainingDocumentInput) -> Validat
     for section_index, section in enumerate(document.sections, start=1):
         if not section.title.strip():
             messages.append(f"Section {section_index} title is required.")
-        if len(section.content_page_titles) == 0:
-            messages.append(f"Section {section_index} must include at least one content page.")
         seen_page_titles: dict[str, str] = {}
         for page_index, page_title in enumerate(section.content_page_titles, start=1):
             normalized_title = page_title.strip()

@@ -32,13 +32,27 @@ def slide_combined_texts(path: Path) -> list[str]:
 
 
 class AppFormTests(unittest.TestCase):
+    def test_form_starts_with_foreword_section(self) -> None:
+        root = create_main_window()
+        try:
+            form = root.form
+
+            document = form.current_document()
+
+            self.assertEqual([section.title for section in document.sections], ["前言"])
+            self.assertEqual(document.sections[0].content_page_titles, [])
+            self.assertEqual(form.selected_section_index, 0)
+        finally:
+            root.update()
+            root.destroy()
+
     def test_form_edits_document_structure_and_preview(self) -> None:
         root = create_main_window()
         try:
             form = root.form
 
             form.set_document_title("TwinCAT Training")
-            form.add_section("Setup")
+            form.rename_selected_section("Setup")
             form.add_content_page("Install Tools")
             form.add_content_page("Connect Controller")
             form.add_section("Operation")
@@ -72,7 +86,7 @@ class AppFormTests(unittest.TestCase):
             form = root.form
 
             form.set_document_title("TwinCAT Training")
-            form.add_section("Setup")
+            form.rename_selected_section("Setup")
             form.add_content_page("Install Tools")
             form.add_content_page("Connect Controller")
             form.add_section("Operation")
@@ -101,22 +115,20 @@ class AppFormTests(unittest.TestCase):
             form = root.form
 
             form.set_document_title("")
-            form.add_section("")
+            form.rename_selected_section("")
 
             self.assertEqual(
                 form.validation_messages(),
                 [
                     "Document title is required.",
                     "Section 1 title is required.",
-                    "Section 1 must include at least one content page.",
                 ],
             )
             self.assertEqual(
                 form.validation_var.get(),
                 (
                     "\u8acb\u8f38\u5165 PPT \u6a19\u984c\u3002 "
-                    "\u7b2c 1 \u500b\u7ae0\u7bc0\u9700\u8981\u6a19\u984c\u3002 "
-                    "\u7b2c 1 \u500b\u7ae0\u7bc0\u81f3\u5c11\u9700\u8981\u4e00\u500b\u5167\u6587\u9801\u3002"
+                    "\u7b2c 1 \u500b\u7ae0\u7bc0\u9700\u8981\u6a19\u984c\u3002"
                 ),
             )
             self.assertEqual(form.preview_text(), "")
@@ -129,7 +141,7 @@ class AppFormTests(unittest.TestCase):
         try:
             form = root.form
             form.set_document_title("TwinCAT Training")
-            form.add_section("Setup")
+            form.rename_selected_section("Setup")
             form.add_content_page("Install Tools")
             form.add_section("Operation")
             form.add_content_page("Open Project")

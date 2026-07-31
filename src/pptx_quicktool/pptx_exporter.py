@@ -21,6 +21,9 @@ DEFAULT_TEMPLATE_PATH = Path(__file__).resolve().parent / "assets" / "default-tr
 RETURN_TO_CONTENTS_TEXT = "回主目錄"
 TABLE_OF_CONTENTS_RETURN_TEXT = "目錄"
 HYPERLINK_BLUE = RGBColor(0x00, 0x70, 0xC0)
+AGENDA_MAX_LINES_PER_COLUMN = 15
+AGENDA_MAX_COLUMNS = 3
+AGENDA_COLUMN_GAP = Inches(0.35)
 
 LAYOUT_NAMES_BY_PAGE_KIND = {
     "cover": ("Title with picture",),
@@ -42,6 +45,15 @@ class RenderContext:
     slide_by_page_id: dict[str, object]
     table_of_contents_slide: object
     agenda_paragraph_styles: dict[int, object]
+
+
+@dataclass(frozen=True)
+class AgendaLine:
+    text: str
+    level: int = 0
+    is_link: bool = False
+    is_current: bool = False
+    target_page_id: str | None = None
 
 
 def export_page_plan_to_pptx(plan: PagePlan, output_path: Path, template_path: Path | None = None) -> Path:
@@ -147,20 +159,13 @@ def _populate_table_of_contents(slide, context: RenderContext) -> None:
         _add_table_of_contents_text_boxes(slide, context.plan, context.slide_by_page_id)
         return
 
-    text_frame = body_shape.text_frame
-    text_frame.clear()
-    _append_agenda_line(text_frame, TABLE_OF_CONTENTS_RETURN_TEXT, paragraph_styles=context.agenda_paragraph_styles)
+    lines = [AgendaLine(TABLE_OF_CONTENTS_RETURN_TEXT)]
     for entry in context.plan.table_of_contents_entries:
-        run = _append_agenda_line(
-            text_frame,
-            entry.title,
-            is_link=True,
-            paragraph_styles=context.agenda_paragraph_styles,
-        )
-        _link_run_to_slide(slide, run, context.slide_by_page_id[entry.target_page_id])
+        lines.append(AgendaLine(entry.title, is_link=True, target_page_id=entry.target_page_id))
         section_page = _page_for_id(context.plan, entry.target_page_id)
         for content_title in _content_titles_for_section(context.plan, section_page):
-            _append_agenda_line(text_frame, content_title, level=1, paragraph_styles=context.agenda_paragraph_styles)
+            lines.append(AgendaLine(content_title, level=1))
+    _populate_agenda_columns(slide, body_shape, lines, context)
 
 
 def _populate_section_agenda(slide, page: PlannedPage, context: RenderContext) -> None:
@@ -170,27 +175,61 @@ def _populate_section_agenda(slide, page: PlannedPage, context: RenderContext) -
         return
 
     current_section_index = _section_index_for_page(page)
-    text_frame = body_shape.text_frame
-    text_frame.clear()
-    run = _append_agenda_line(
-        text_frame,
-        TABLE_OF_CONTENTS_RETURN_TEXT,
-        is_link=True,
-        paragraph_styles=context.agenda_paragraph_styles,
-    )
-    _link_run_to_slide(slide, run, context.table_of_contents_slide)
+    lines = [
+        AgendaLine(
+            TABLE_OF_CONTENTS_RETURN_TEXT,
+            is_link=True,
+            target_page_id="table-of-contents",
+        )
+    ]
     for entry_index, entry in enumerate(context.plan.table_of_contents_entries, start=1):
         section_page = _page_for_id(context.plan, entry.target_page_id)
-        run = _append_agenda_line(
-            text_frame,
-            entry.title,
-            is_current=entry_index == current_section_index,
-            paragraph_styles=context.agenda_paragraph_styles,
+        lines.append(
+            AgendaLine(
+                entry.title,
+                is_current=entry_index == current_section_index,
+            )
         )
-        if entry_index == current_section_index:
-            run.font.bold = True
         for content_title in _content_titles_for_section(context.plan, section_page):
-            _append_agenda_line(text_frame, content_title, level=1, paragraph_styles=context.agenda_paragraph_styles)
+            lines.append(AgendaLine(content_title, level=1))
+    _populate_agenda_columns(slide, body_shape, lines, context)
+
+
+def _populate_agenda_columns(slide, body_shape, lines: list[AgendaLine], context: RenderContext) -> None:
+    body_shape.text_frame.clear()
+    columns = _agenda_columns(lines)
+    column_count = len(columns)
+    column_width = int((body_shape.width - AGENDA_COLUMN_GAP * (column_count - 1)) / column_count)
+
+    for column_index, column_lines in enumerate(columns):
+        left = body_shape.left + (column_width + AGENDA_COLUMN_GAP) * column_index
+        box = slide.shapes.add_textbox(left, body_shape.top, column_width, body_shape.height)
+        text_frame = box.text_frame
+        text_frame.clear()
+        text_frame.word_wrap = True
+        for line in column_lines:
+            run = _append_agenda_line(
+                text_frame,
+                line.text,
+                level=line.level,
+                is_link=line.is_link,
+                is_current=line.is_current,
+                paragraph_styles=context.agenda_paragraph_styles,
+            )
+            if line.target_page_id is not None:
+                _link_run_to_slide(slide, run, context.slide_by_page_id[line.target_page_id])
+
+
+def _agenda_columns(lines: list[AgendaLine]) -> list[list[AgendaLine]]:
+    if not lines:
+        return [[]]
+    column_count = min(AGENDA_MAX_COLUMNS, max(1, _ceiling_divide(len(lines), AGENDA_MAX_LINES_PER_COLUMN)))
+    lines_per_column = _ceiling_divide(len(lines), column_count)
+    return [lines[index : index + lines_per_column] for index in range(0, len(lines), lines_per_column)]
+
+
+def _ceiling_divide(value: int, divisor: int) -> int:
+    return -(-value // divisor)
 
 
 def _add_table_of_contents_text_boxes(slide, plan: PagePlan, slide_by_page_id) -> None:

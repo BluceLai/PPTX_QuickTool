@@ -87,7 +87,7 @@ class TrainingDocumentInputTests(unittest.TestCase):
         self.assertFalse(result.is_valid)
         self.assertEqual(result.messages, ["Section 2 title is required."])
 
-    def test_validation_rejects_sections_without_content_pages(self) -> None:
+    def test_validation_allows_sections_without_content_pages(self) -> None:
         document = TrainingDocumentInput(
             title="TwinCAT Training",
             sections=[
@@ -97,8 +97,8 @@ class TrainingDocumentInputTests(unittest.TestCase):
 
         result = validate_training_document_input(document)
 
-        self.assertFalse(result.is_valid)
-        self.assertEqual(result.messages, ["Section 1 must include at least one content page."])
+        self.assertTrue(result.is_valid)
+        self.assertEqual(result.messages, [])
 
     def test_validation_rejects_empty_content_page_titles(self) -> None:
         document = TrainingDocumentInput(

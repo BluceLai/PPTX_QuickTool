@@ -57,6 +57,14 @@ def paragraph_with_text(slide, text: str):
     raise AssertionError(f"Could not find paragraph with text: {text}")
 
 
+def agenda_shapes(slide):
+    return [
+        shape
+        for shape in slide.shapes
+        if hasattr(shape, "text_frame") and shape.text.strip() and shape.text.strip() != "目錄"
+    ]
+
+
 def placeholder_shape_with_text(slide, text: str):
     shape = shape_with_text(slide, text)
     if not shape.is_placeholder:
@@ -279,6 +287,52 @@ class PptxExporterTests(unittest.TestCase):
         self.assertEqual(len(presentation.slides), 4)
         self.assertEqual(presentation.slides[0].slide_layout.name, "Title with picture")
         self.assertEqual(DEFAULT_TEMPLATE_PATH.stat().st_mtime_ns, template_mtime)
+
+    def test_agenda_wraps_to_at_most_three_columns_before_exceeding_the_body_area(self) -> None:
+        document = TrainingDocumentInput(
+            title="測試文件",
+            sections=[
+                SectionInput(title=f"章節{i}", content_page_titles=[str(page) for page in range(1, 6)])
+                for i in range(1, 8)
+            ],
+        )
+        plan = generate_page_plan(document)
+        output_dir = ROOT / ".tmp" / "test-output"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / "training-document-multi-column-agenda.pptx"
+
+        export_page_plan_to_pptx(plan, output_path)
+
+        presentation = Presentation(output_path)
+        table_of_contents_shapes = agenda_shapes(presentation.slides[1])
+
+        self.assertEqual(len(table_of_contents_shapes), 3)
+        self.assertEqual(sorted({shape.left for shape in table_of_contents_shapes}), [shape.left for shape in table_of_contents_shapes])
+        for shape in table_of_contents_shapes:
+            populated_paragraphs = [paragraph for paragraph in shape.text_frame.paragraphs if paragraph.text.strip()]
+            self.assertLessEqual(len(populated_paragraphs), 15)
+            self.assertLessEqual(shape.top + shape.height, presentation.slide_height)
+
+    def test_exports_section_without_content_pages(self) -> None:
+        document = TrainingDocumentInput(
+            title="測試文件",
+            sections=[
+                SectionInput(title="前言", content_page_titles=[]),
+                SectionInput(title="章節1", content_page_titles=["1"]),
+            ],
+        )
+        plan = generate_page_plan(document)
+        output_dir = ROOT / ".tmp" / "test-output"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / "training-document-section-without-content.pptx"
+
+        export_page_plan_to_pptx(plan, output_path)
+
+        presentation = Presentation(output_path)
+        self.assertEqual(len(presentation.slides), 5)
+        self.assertIn("前言", slide_combined_text(presentation.slides[1]))
+        self.assertIn("前言", slide_combined_text(presentation.slides[2]))
+        self.assertEqual(linked_slide_indices(presentation, presentation.slides[1]), [2, 3])
 
 
 if __name__ == "__main__":

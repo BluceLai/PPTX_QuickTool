@@ -29,8 +29,8 @@ class EditableSection:
 class TrainingDocumentForm:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
-        self.sections: list[EditableSection] = []
-        self.selected_section_index: int | None = None
+        self.sections: list[EditableSection] = [EditableSection(title="前言")]
+        self.selected_section_index: int | None = 0
 
         self.title_var = tk.StringVar()
         self.section_title_var = tk.StringVar()
