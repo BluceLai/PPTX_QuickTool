@@ -118,13 +118,13 @@ class PptxExporterTests(unittest.TestCase):
         self.assertEqual(len(presentation.slides), 7)
         self.assertIn("TwinCAT Training", slide_combined_text(presentation.slides[0]))
         self.assertIn("目錄", slide_combined_text(presentation.slides[1]))
-        self.assertIn("1. Setup", slide_combined_text(presentation.slides[1]))
-        self.assertIn("    - Install Tools", slide_combined_text(presentation.slides[1]))
-        self.assertIn("    - Connect Controller", slide_combined_text(presentation.slides[1]))
-        self.assertIn("2. Operation", slide_combined_text(presentation.slides[1]))
+        self.assertIn("Setup", slide_combined_text(presentation.slides[1]))
+        self.assertIn("Install Tools", slide_combined_text(presentation.slides[1]))
+        self.assertIn("Connect Controller", slide_combined_text(presentation.slides[1]))
+        self.assertIn("Operation", slide_combined_text(presentation.slides[1]))
         self.assertIn("Setup", slide_combined_text(presentation.slides[2]))
         self.assertIn("Install Tools", slide_combined_text(presentation.slides[3]))
-        self.assertIn("回主目錄", slide_combined_text(presentation.slides[3]))
+        self.assertNotIn("回主目錄", slide_combined_text(presentation.slides[3]))
 
     def test_exports_table_of_contents_and_return_navigation_links(self) -> None:
         document = TrainingDocumentInput(
@@ -150,9 +150,10 @@ class PptxExporterTests(unittest.TestCase):
         self.assertEqual(linked_slide_indices(presentation, presentation.slides[1]), [2, 5])
         self.assertEqual(linked_slide_indices(presentation, presentation.slides[2]), [1])
         self.assertIn("目錄", slide_combined_text(presentation.slides[2]))
-        self.assertIn("2. Operation", slide_combined_text(presentation.slides[2]))
-        for slide_index in [3, 4, 5, 6]:
-            self.assertEqual(linked_slide_indices(presentation, presentation.slides[slide_index]), [1])
+        self.assertIn("Operation", slide_combined_text(presentation.slides[2]))
+        self.assertEqual(linked_slide_indices(presentation, presentation.slides[5]), [1])
+        for slide_index in [3, 4, 6]:
+            self.assertEqual(linked_slide_indices(presentation, presentation.slides[slide_index]), [])
 
     def test_table_of_contents_links_follow_reordered_sections(self) -> None:
         document = TrainingDocumentInput(
@@ -176,6 +177,35 @@ class PptxExporterTests(unittest.TestCase):
 
         presentation = Presentation(output_path)
         self.assertEqual(linked_slide_indices(presentation, presentation.slides[1]), [2, 4])
+
+    def test_agenda_text_leaves_bullets_and_numbering_to_the_template(self) -> None:
+        document = TrainingDocumentInput(
+            title="測試文件",
+            sections=[
+                SectionInput(title="測試1", content_page_titles=["1", "2"]),
+                SectionInput(title="測試2", content_page_titles=["1", "2"]),
+            ],
+        )
+        plan = generate_page_plan(document)
+        output_dir = ROOT / ".tmp" / "test-output"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / "training-document-template-agenda-text.pptx"
+
+        export_page_plan_to_pptx(plan, output_path)
+
+        presentation = Presentation(output_path)
+        table_of_contents_text = slide_combined_text(presentation.slides[1])
+        section_text = slide_combined_text(presentation.slides[2])
+
+        self.assertIn("測試1", table_of_contents_text)
+        self.assertIn("測試2", table_of_contents_text)
+        self.assertIn("1", table_of_contents_text)
+        self.assertNotIn("1. 測試1", table_of_contents_text)
+        self.assertNotIn("2. 測試2", table_of_contents_text)
+        self.assertNotIn("- 1", table_of_contents_text)
+        self.assertNotIn("- 2", table_of_contents_text)
+        self.assertNotIn("1. 測試1", section_text)
+        self.assertNotIn("- 1", section_text)
 
     def test_exports_reference_size_and_consistent_title_hierarchy(self) -> None:
         document = TrainingDocumentInput(

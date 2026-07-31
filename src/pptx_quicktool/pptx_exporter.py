@@ -80,7 +80,6 @@ def _populate_slide(slide, page: PlannedPage, plan: PagePlan, slide_by_page_id, 
         _populate_section_agenda(slide, page, plan, table_of_contents_slide)
     elif page.kind == "content":
         _clear_body_placeholder(slide)
-        _add_return_link(slide, table_of_contents_slide)
 
 
 def _set_title(slide, text: str) -> None:
@@ -124,16 +123,16 @@ def _populate_table_of_contents(slide, plan: PagePlan, slide_by_page_id) -> None
     text_frame = body_shape.text_frame
     text_frame.clear()
     _append_agenda_line(text_frame, TABLE_OF_CONTENTS_RETURN_TEXT)
-    for entry_index, entry in enumerate(plan.table_of_contents_entries, start=1):
+    for entry in plan.table_of_contents_entries:
         run = _append_agenda_line(
             text_frame,
-            f"{entry_index}. {entry.title}",
+            entry.title,
             is_link=True,
         )
         _link_run_to_slide(slide, run, slide_by_page_id[entry.target_page_id])
         section_page = _page_for_id(plan, entry.target_page_id)
         for content_title in _content_titles_for_section(plan, section_page):
-            _append_agenda_line(text_frame, f"- {content_title}", level=1)
+            _append_agenda_line(text_frame, content_title, level=1)
 
 
 def _populate_section_agenda(slide, page: PlannedPage, plan: PagePlan, table_of_contents_slide) -> None:
@@ -149,22 +148,18 @@ def _populate_section_agenda(slide, page: PlannedPage, plan: PagePlan, table_of_
     _link_run_to_slide(slide, run, table_of_contents_slide)
     for entry_index, entry in enumerate(plan.table_of_contents_entries, start=1):
         section_page = _page_for_id(plan, entry.target_page_id)
-        run = _append_agenda_line(
-            text_frame,
-            f"{entry_index}. {entry.title}",
-            is_current=entry_index == current_section_index,
-        )
+        run = _append_agenda_line(text_frame, entry.title, is_current=entry_index == current_section_index)
         if entry_index == current_section_index:
             run.font.bold = True
         for content_title in _content_titles_for_section(plan, section_page):
-            _append_agenda_line(text_frame, f"- {content_title}", level=1)
+            _append_agenda_line(text_frame, content_title, level=1)
 
 
 def _add_table_of_contents_text_boxes(slide, plan: PagePlan, slide_by_page_id) -> None:
     for entry_index, entry in enumerate(plan.table_of_contents_entries, start=1):
         link = _add_link_text(
             slide,
-            f"{entry_index}. {entry.title}",
+            entry.title,
             Inches(1.15),
             Inches(1.65 + (entry_index - 1) * 0.48),
             Inches(10.4),
@@ -177,7 +172,7 @@ def _append_agenda_line(text_frame, text: str, level: int = 0, is_link: bool = F
     paragraph = text_frame.paragraphs[0] if _is_empty_text_frame(text_frame) else text_frame.add_paragraph()
     paragraph.level = level
     run = paragraph.add_run()
-    run.text = f"    {text}" if level > 0 else text
+    run.text = text
     if is_link:
         run.font.color.rgb = HYPERLINK_BLUE
         run.font.underline = True

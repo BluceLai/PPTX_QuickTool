@@ -9,7 +9,6 @@ from pptx.oxml.ns import qn
 from .page_plan import PagePlan
 from .pptx_exporter import (
     DEFAULT_TEMPLATE_PATH,
-    RETURN_TO_CONTENTS_TEXT,
     SLIDE_HEIGHT,
     SLIDE_WIDTH,
     TABLE_OF_CONTENTS_RETURN_TEXT,
@@ -55,14 +54,11 @@ def _verify_required_text(presentation: Presentation, plan: PagePlan) -> list[st
         if page.title not in text:
             messages.append(f"Slide {index + 1} is missing required text: {page.title}.")
         if page.kind == "table_of_contents":
-            for entry_index, entry in enumerate(plan.table_of_contents_entries, start=1):
-                expected = f"{entry_index}. {entry.title}"
-                if expected not in text:
-                    messages.append(f"Slide {index + 1} is missing table of contents entry: {expected}.")
+            for entry in plan.table_of_contents_entries:
+                if entry.title not in text:
+                    messages.append(f"Slide {index + 1} is missing table of contents entry: {entry.title}.")
         if page.kind == "section_start" and TABLE_OF_CONTENTS_RETURN_TEXT not in text:
             messages.append(f"Slide {index + 1} is missing the table-of-contents return text.")
-        if page.kind == "content" and RETURN_TO_CONTENTS_TEXT not in text:
-            messages.append(f"Slide {index + 1} is missing the return-to-contents link text.")
     return messages
 
 
@@ -78,7 +74,7 @@ def _verify_navigation_links(presentation: Presentation, plan: PagePlan) -> list
             messages.append(f"Table of contents entry {entry_index} links to the wrong slide.")
 
     for slide_index, page in enumerate(plan.pages):
-        if page.kind not in {"section_start", "content"}:
+        if page.kind != "section_start":
             continue
         linked_indices = _linked_slide_indices(presentation, presentation.slides[slide_index])
         if table_of_contents_index not in linked_indices:
