@@ -45,7 +45,8 @@ def generate_page_plan(document: TrainingDocumentInput) -> PagePlan:
         table_of_contents_entries.append(
             TableOfContentsEntry(title=section.title, target_page_id=section_page_id)
         )
-        for content_index, content_page_title in enumerate(section.content_page_titles, start=1):
+        content_page_titles = section.content_page_titles or [section.title]
+        for content_index, content_page_title in enumerate(content_page_titles, start=1):
             pages.append(
                 PlannedPage(
                     page_id=f"section-{section_index}-content-{content_index}",

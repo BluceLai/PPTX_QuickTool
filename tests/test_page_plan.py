@@ -100,6 +100,26 @@ class PagePlanTests(unittest.TestCase):
             ],
         )
 
+    def test_section_without_content_pages_gets_a_blank_content_page_named_after_the_section(self) -> None:
+        document = TrainingDocumentInput(
+            title="TwinCAT Training",
+            sections=[
+                SectionInput(title="Foreword", content_page_titles=[]),
+            ],
+        )
+
+        plan = generate_page_plan(document)
+
+        self.assertEqual(
+            [(page.page_id, page.kind, page.title) for page in plan.pages],
+            [
+                ("cover", "cover", "TwinCAT Training"),
+                ("table-of-contents", "table_of_contents", "\u76ee\u9304"),
+                ("section-1", "section_start", "Foreword"),
+                ("section-1-content-1", "content", "Foreword"),
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

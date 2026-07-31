@@ -33,17 +33,8 @@ def validate_training_document_input(document: TrainingDocumentInput) -> Validat
     for section_index, section in enumerate(document.sections, start=1):
         if not section.title.strip():
             messages.append(f"Section {section_index} title is required.")
-        seen_page_titles: dict[str, str] = {}
         for page_index, page_title in enumerate(section.content_page_titles, start=1):
             normalized_title = page_title.strip()
             if not normalized_title:
                 messages.append(f"Section {section_index} content page {page_index} title is required.")
-                continue
-            duplicate_key = normalized_title.casefold()
-            if duplicate_key in seen_page_titles:
-                messages.append(
-                    f"Section {section_index} content page title is duplicated: {seen_page_titles[duplicate_key]}."
-                )
-            else:
-                seen_page_titles[duplicate_key] = normalized_title
     return ValidationResult(messages=messages)

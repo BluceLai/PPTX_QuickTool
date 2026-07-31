@@ -52,4 +52,6 @@ Then build the distributable zip:
 python scripts/build_exe.py
 ```
 
-The build command writes `dist/PPTX_QuickTool_v0.1.0.zip`. Share that zip with coworkers. They can extract it and run `PPTX QuickTool/PPTX QuickTool.exe`.
+The build command writes a versioned zip such as `dist/PPTX_QuickTool_v0.1.1.zip`. Share that zip with coworkers. They can extract it and run `PPTX QuickTool/PPTX QuickTool.exe`.
+
+The `dist/` folder keeps only the latest extracted release folder. Older release folders and older release zips are moved to `dist/archive/`.

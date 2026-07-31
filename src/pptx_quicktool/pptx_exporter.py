@@ -218,6 +218,7 @@ def _populate_agenda_columns(slide, body_shape, lines: list[AgendaLine], context
             )
             if line.target_page_id is not None:
                 _link_run_to_slide(slide, run, context.slide_by_page_id[line.target_page_id])
+    _remove_shape(body_shape)
 
 
 def _agenda_columns(lines: list[AgendaLine]) -> list[list[AgendaLine]]:
@@ -335,6 +336,10 @@ def _placeholder(slide, placeholder_type):
         if shape.is_placeholder and shape.placeholder_format.type == placeholder_type:
             return shape
     return None
+
+
+def _remove_shape(shape) -> None:
+    shape._element.getparent().remove(shape._element)
 
 
 def _link_run_to_slide(slide, run, target_slide) -> None:

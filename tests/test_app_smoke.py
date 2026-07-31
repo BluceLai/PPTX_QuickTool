@@ -18,7 +18,7 @@ from pptx_quicktool.__main__ import main
 
 class AppSmokeTests(unittest.TestCase):
     def test_package_has_version(self) -> None:
-        self.assertEqual(__version__, "0.1.0")
+        self.assertEqual(__version__, "0.1.1")
 
     def test_create_main_window_sets_title(self) -> None:
         root = create_main_window()

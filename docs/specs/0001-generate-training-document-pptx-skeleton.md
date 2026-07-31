@@ -64,7 +64,7 @@ The goal is to quickly produce a clean first draft, not to complete the final tr
 - Unit tests should verify that a title plus section/page input creates the correct page order.
 - Unit tests should verify that table of contents entries point to the correct generated section pages.
 - Unit tests should verify that generated section start pages can link back to the table of contents and generated content pages do not display return links.
-- Validation tests should cover missing document titles, empty section titles, duplicate or blank content page titles, and the allowed case where a section has no content pages.
+- Validation tests should cover missing document titles, empty section titles, blank content page titles, duplicate content page titles as an allowed case, and the allowed case where a section has no content pages.
 - UI tests should verify the default foreword section.
 - PPTX generation tests should verify that long agenda content uses no more than three columns and stays within the slide boundary.
 - PPTX generation tests should verify that the output file opens as a valid PPTX and contains the expected slide count and visible text.

@@ -65,6 +65,14 @@ def agenda_shapes(slide):
     ]
 
 
+def body_placeholders(slide):
+    return [
+        shape
+        for shape in slide.shapes
+        if shape.is_placeholder and shape.placeholder_format.type == PP_PLACEHOLDER.BODY
+    ]
+
+
 def placeholder_shape_with_text(slide, text: str):
     shape = shape_with_text(slide, text)
     if not shape.is_placeholder:
@@ -329,10 +337,31 @@ class PptxExporterTests(unittest.TestCase):
         export_page_plan_to_pptx(plan, output_path)
 
         presentation = Presentation(output_path)
-        self.assertEqual(len(presentation.slides), 5)
+        self.assertEqual(len(presentation.slides), 6)
         self.assertIn("前言", slide_combined_text(presentation.slides[1]))
         self.assertIn("前言", slide_combined_text(presentation.slides[2]))
-        self.assertEqual(linked_slide_indices(presentation, presentation.slides[1]), [2, 3])
+        self.assertIn("前言", slide_combined_text(presentation.slides[3]))
+        self.assertEqual(presentation.slides[3].slide_layout.name, "Text")
+        self.assertEqual(linked_slide_indices(presentation, presentation.slides[1]), [2, 4])
+
+    def test_agenda_slides_remove_template_body_placeholders_after_populating_columns(self) -> None:
+        document = TrainingDocumentInput(
+            title="測試文件",
+            sections=[
+                SectionInput(title="前言", content_page_titles=[]),
+                SectionInput(title="章節1", content_page_titles=["1"]),
+            ],
+        )
+        plan = generate_page_plan(document)
+        output_dir = ROOT / ".tmp" / "test-output"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / "training-document-no-agenda-placeholder.pptx"
+
+        export_page_plan_to_pptx(plan, output_path)
+
+        presentation = Presentation(output_path)
+        self.assertEqual(body_placeholders(presentation.slides[1]), [])
+        self.assertEqual(body_placeholders(presentation.slides[2]), [])
 
 
 if __name__ == "__main__":

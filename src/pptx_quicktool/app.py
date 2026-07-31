@@ -446,10 +446,6 @@ def _localize_validation_message(message: str) -> str:
     if match:
         return f"第 {match.group(1)} 個章節需要標題。"
 
-    match = re.fullmatch(r"Section (\d+) must include at least one content page\.", message)
-    if match:
-        return f"第 {match.group(1)} 個章節至少需要一個內文頁。"
-
     match = re.fullmatch(r"Section (\d+) content page (\d+) title is required\.", message)
     if match:
         return f"第 {match.group(1)} 個章節的第 {match.group(2)} 個內文頁需要標題。"
