@@ -4,12 +4,12 @@
 
 **Blocked by:** 03 - Generate PPTX Page Plan.
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] The generator creates a new PPTX file without mutating the reference file.
-- [ ] The generated PPTX has the expected slide count.
-- [ ] The generated PPTX includes the document title on the cover page.
-- [ ] The generated PPTX includes table of contents text from the section list.
-- [ ] The generated PPTX includes section start pages.
-- [ ] The generated PPTX includes content pages with their entered titles.
-- [ ] Automated verification confirms the output is a valid PPTX.
+- [x] The generator creates a new PPTX file without mutating the reference file.
+- [x] The generated PPTX has the expected slide count.
+- [x] The generated PPTX includes the document title on the cover page.
+- [x] The generated PPTX includes table of contents text from the section list.
+- [x] The generated PPTX includes section start pages.
+- [x] The generated PPTX includes content pages with their entered titles.
+- [x] Automated verification confirms the output is a valid PPTX.

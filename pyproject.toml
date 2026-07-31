@@ -3,7 +3,9 @@ name = "pptx-quicktool"
 version = "0.1.0"
 description = "Desktop tool for generating PowerPoint training document skeletons."
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "python-pptx>=1.0.2",
+]
 
 [project.scripts]
 pptx-quicktool = "pptx_quicktool.__main__:main"

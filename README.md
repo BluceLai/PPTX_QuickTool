@@ -8,6 +8,7 @@ The first product slice focuses on creating the project foundation. Later ticket
 
 - Python 3.11 or newer
 - Tkinter support in the local Python installation
+- `python-pptx` for PowerPoint generation
 
 ## Run The Desktop App
 
