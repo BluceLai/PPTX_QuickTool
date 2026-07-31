@@ -25,6 +25,7 @@ class AppSmokeTests(unittest.TestCase):
         try:
             self.assertEqual(root.title(), APP_TITLE)
         finally:
+            root.update()
             root.destroy()
 
     def test_smoke_mode_exits_successfully(self) -> None:

@@ -20,7 +20,7 @@ def main(argv: list[str] | None = None) -> int:
     root = create_main_window()
 
     if args.smoke:
-        root.update_idletasks()
+        root.update()
         root.destroy()
         return 0
 

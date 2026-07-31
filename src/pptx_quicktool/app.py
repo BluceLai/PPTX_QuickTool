@@ -1,73 +1,322 @@
 from __future__ import annotations
 
 import tkinter as tk
+from dataclasses import dataclass, field
 from tkinter import ttk
+
+from .page_plan import generate_page_plan
+from .training_document import (
+    SectionInput,
+    TrainingDocumentInput,
+    validate_training_document_input,
+)
 
 
 APP_TITLE = "PPTX QuickTool"
-APP_GEOMETRY = "960x640"
+APP_GEOMETRY = "1080x720"
+
+
+@dataclass
+class EditableSection:
+    title: str
+    content_page_titles: list[str] = field(default_factory=list)
+
+
+class TrainingDocumentForm:
+    def __init__(self, root: tk.Tk) -> None:
+        self.root = root
+        self.sections: list[EditableSection] = []
+        self.selected_section_index: int | None = None
+
+        self.title_var = tk.StringVar()
+        self.section_title_var = tk.StringVar()
+        self.content_title_var = tk.StringVar()
+        self.validation_var = tk.StringVar(value="Add a title and at least one section.")
+
+        self._build()
+        self._refresh()
+
+    def set_document_title(self, title: str) -> None:
+        self.title_var.set(title)
+        self._refresh()
+
+    def add_section(self, title: str) -> None:
+        self.sections.append(EditableSection(title=title))
+        self.selected_section_index = len(self.sections) - 1
+        self._refresh()
+
+    def rename_selected_section(self, title: str) -> None:
+        if self.selected_section_index is None:
+            return
+        self.sections[self.selected_section_index].title = title
+        self._refresh()
+
+    def remove_selected_section(self) -> None:
+        if self.selected_section_index is None:
+            return
+        del self.sections[self.selected_section_index]
+        if not self.sections:
+            self.selected_section_index = None
+        else:
+            self.selected_section_index = min(self.selected_section_index, len(self.sections) - 1)
+        self._refresh()
+
+    def move_selected_section_up(self) -> None:
+        if self.selected_section_index is None or self.selected_section_index == 0:
+            return
+        index = self.selected_section_index
+        self.sections[index - 1], self.sections[index] = self.sections[index], self.sections[index - 1]
+        self.selected_section_index = index - 1
+        self._refresh()
+
+    def move_selected_section_down(self) -> None:
+        if self.selected_section_index is None or self.selected_section_index >= len(self.sections) - 1:
+            return
+        index = self.selected_section_index
+        self.sections[index + 1], self.sections[index] = self.sections[index], self.sections[index + 1]
+        self.selected_section_index = index + 1
+        self._refresh()
+
+    def select_section(self, index: int) -> None:
+        if index < 0 or index >= len(self.sections):
+            self.selected_section_index = None
+        else:
+            self.selected_section_index = index
+        self._refresh()
+
+    def add_content_page(self, title: str) -> None:
+        section = self._selected_section()
+        if section is None:
+            return
+        section.content_page_titles.append(title)
+        self._refresh()
+
+    def rename_content_page(self, index: int, title: str) -> None:
+        section = self._selected_section()
+        if section is None or index < 0 or index >= len(section.content_page_titles):
+            return
+        section.content_page_titles[index] = title
+        self._refresh()
+
+    def remove_content_page(self, index: int) -> None:
+        section = self._selected_section()
+        if section is None or index < 0 or index >= len(section.content_page_titles):
+            return
+        del section.content_page_titles[index]
+        self._refresh()
+
+    def move_content_page_up(self, index: int) -> None:
+        section = self._selected_section()
+        if section is None or index <= 0 or index >= len(section.content_page_titles):
+            return
+        pages = section.content_page_titles
+        pages[index - 1], pages[index] = pages[index], pages[index - 1]
+        self._refresh()
+
+    def move_content_page_down(self, index: int) -> None:
+        section = self._selected_section()
+        if section is None or index < 0 or index >= len(section.content_page_titles) - 1:
+            return
+        pages = section.content_page_titles
+        pages[index + 1], pages[index] = pages[index], pages[index + 1]
+        self._refresh()
+
+    def current_document(self) -> TrainingDocumentInput:
+        return TrainingDocumentInput(
+            title=self.title_var.get(),
+            sections=[
+                SectionInput(title=section.title, content_page_titles=list(section.content_page_titles))
+                for section in self.sections
+            ],
+        )
+
+    def validation_messages(self) -> list[str]:
+        return validate_training_document_input(self.current_document()).messages
+
+    def preview_text(self) -> str:
+        document = self.current_document()
+        if validate_training_document_input(document).messages:
+            return ""
+        plan = generate_page_plan(document)
+        labels = {
+            "cover": "Cover",
+            "table_of_contents": "Table of contents",
+            "section_start": "Section",
+            "content": "Content",
+        }
+        lines = []
+        for index, page in enumerate(plan.pages, start=1):
+            label = labels[page.kind]
+            if page.kind == "table_of_contents":
+                lines.append(f"{index}. {label}")
+            else:
+                lines.append(f"{index}. {label} - {page.title}")
+        return "\n".join(lines)
+
+    def _build(self) -> None:
+        self.root.columnconfigure(0, weight=1)
+        self.root.rowconfigure(0, weight=1)
+
+        frame = ttk.Frame(self.root, padding=18, style="App.TFrame")
+        frame.grid(row=0, column=0, sticky="nsew")
+        frame.columnconfigure(0, weight=1)
+        frame.columnconfigure(1, weight=1)
+        frame.rowconfigure(2, weight=1)
+
+        ttk.Label(frame, text=APP_TITLE, style="Header.TLabel").grid(row=0, column=0, columnspan=2, sticky="w")
+        ttk.Label(
+            frame,
+            text="Create a training document structure before generating the PPTX.",
+            style="Body.TLabel",
+        ).grid(row=1, column=0, columnspan=2, sticky="w", pady=(4, 14))
+
+        left = ttk.Frame(frame, style="App.TFrame")
+        left.grid(row=2, column=0, sticky="nsew", padx=(0, 10))
+        left.columnconfigure(0, weight=1)
+        left.rowconfigure(3, weight=1)
+        left.rowconfigure(7, weight=1)
+
+        right = ttk.Frame(frame, style="App.TFrame")
+        right.grid(row=2, column=1, sticky="nsew", padx=(10, 0))
+        right.columnconfigure(0, weight=1)
+        right.rowconfigure(1, weight=1)
+
+        ttk.Label(left, text="PPT title", style="Body.TLabel").grid(row=0, column=0, sticky="w")
+        ttk.Entry(left, textvariable=self.title_var).grid(row=1, column=0, sticky="ew", pady=(3, 12))
+        self.title_var.trace_add("write", lambda *_: self._refresh())
+
+        ttk.Label(left, text="Sections", style="Body.TLabel").grid(row=2, column=0, sticky="w")
+        self.section_list = tk.Listbox(left, height=8, exportselection=False)
+        self.section_list.grid(row=3, column=0, sticky="nsew")
+        self.section_list.bind("<<ListboxSelect>>", self._on_section_selected)
+
+        section_controls = ttk.Frame(left, style="App.TFrame")
+        section_controls.grid(row=4, column=0, sticky="ew", pady=(8, 12))
+        section_controls.columnconfigure(0, weight=1)
+        ttk.Entry(section_controls, textvariable=self.section_title_var).grid(row=0, column=0, sticky="ew")
+        ttk.Button(section_controls, text="Add", command=self._add_section_from_entry).grid(row=0, column=1, padx=(6, 0))
+        ttk.Button(section_controls, text="Rename", command=self._rename_section_from_entry).grid(row=0, column=2, padx=(6, 0))
+        ttk.Button(section_controls, text="Remove", command=self.remove_selected_section).grid(row=0, column=3, padx=(6, 0))
+        ttk.Button(section_controls, text="Up", command=self.move_selected_section_up).grid(row=1, column=1, padx=(6, 0), pady=(6, 0))
+        ttk.Button(section_controls, text="Down", command=self.move_selected_section_down).grid(row=1, column=2, padx=(6, 0), pady=(6, 0))
+
+        ttk.Label(left, text="Content pages in selected section", style="Body.TLabel").grid(row=5, column=0, sticky="w")
+        self.content_list = tk.Listbox(left, height=7, exportselection=False)
+        self.content_list.grid(row=7, column=0, sticky="nsew")
+
+        content_controls = ttk.Frame(left, style="App.TFrame")
+        content_controls.grid(row=8, column=0, sticky="ew", pady=(8, 0))
+        content_controls.columnconfigure(0, weight=1)
+        ttk.Entry(content_controls, textvariable=self.content_title_var).grid(row=0, column=0, sticky="ew")
+        ttk.Button(content_controls, text="Add", command=self._add_content_from_entry).grid(row=0, column=1, padx=(6, 0))
+        ttk.Button(content_controls, text="Rename", command=self._rename_content_from_entry).grid(row=0, column=2, padx=(6, 0))
+        ttk.Button(content_controls, text="Remove", command=self._remove_selected_content).grid(row=0, column=3, padx=(6, 0))
+        ttk.Button(content_controls, text="Up", command=self._move_selected_content_up).grid(row=1, column=1, padx=(6, 0), pady=(6, 0))
+        ttk.Button(content_controls, text="Down", command=self._move_selected_content_down).grid(row=1, column=2, padx=(6, 0), pady=(6, 0))
+
+        ttk.Label(right, text="Slide preview", style="Body.TLabel").grid(row=0, column=0, sticky="w")
+        self.preview = tk.Text(right, height=20, wrap="word", borderwidth=1, relief="solid")
+        self.preview.grid(row=1, column=0, sticky="nsew", pady=(3, 12))
+        self.preview.configure(state="disabled")
+
+        self.validation_label = ttk.Label(right, textvariable=self.validation_var, style="Status.TLabel", padding=(8, 6))
+        self.validation_label.grid(row=2, column=0, sticky="ew")
+
+    def _refresh(self) -> None:
+        if hasattr(self, "section_list"):
+            self._refresh_sections()
+            self._refresh_content_pages()
+            self._refresh_preview_and_validation()
+
+    def _refresh_sections(self) -> None:
+        self.section_list.delete(0, tk.END)
+        for index, section in enumerate(self.sections, start=1):
+            self.section_list.insert(tk.END, f"{index}. {section.title}")
+        if self.selected_section_index is not None and self.sections:
+            self.section_list.selection_set(self.selected_section_index)
+            self.section_list.activate(self.selected_section_index)
+
+    def _refresh_content_pages(self) -> None:
+        self.content_list.delete(0, tk.END)
+        section = self._selected_section()
+        if section is None:
+            return
+        for index, title in enumerate(section.content_page_titles, start=1):
+            self.content_list.insert(tk.END, f"{index}. {title}")
+
+    def _refresh_preview_and_validation(self) -> None:
+        messages = self.validation_messages()
+        self.validation_var.set("Ready" if not messages else " ".join(messages))
+        self.preview.configure(state="normal")
+        self.preview.delete("1.0", tk.END)
+        preview = self.preview_text()
+        if preview:
+            self.preview.insert("1.0", preview)
+        self.preview.configure(state="disabled")
+
+    def _selected_section(self) -> EditableSection | None:
+        if self.selected_section_index is None:
+            return None
+        if self.selected_section_index < 0 or self.selected_section_index >= len(self.sections):
+            return None
+        return self.sections[self.selected_section_index]
+
+    def _on_section_selected(self, _event=None) -> None:
+        selection = self.section_list.curselection()
+        self.selected_section_index = selection[0] if selection else None
+        self._refresh()
+
+    def _add_section_from_entry(self) -> None:
+        self.add_section(self.section_title_var.get())
+        self.section_title_var.set("")
+
+    def _rename_section_from_entry(self) -> None:
+        self.rename_selected_section(self.section_title_var.get())
+
+    def _add_content_from_entry(self) -> None:
+        self.add_content_page(self.content_title_var.get())
+        self.content_title_var.set("")
+
+    def _rename_content_from_entry(self) -> None:
+        index = self._selected_content_index()
+        if index is not None:
+            self.rename_content_page(index, self.content_title_var.get())
+
+    def _remove_selected_content(self) -> None:
+        index = self._selected_content_index()
+        if index is not None:
+            self.remove_content_page(index)
+
+    def _move_selected_content_up(self) -> None:
+        index = self._selected_content_index()
+        if index is not None:
+            self.move_content_page_up(index)
+
+    def _move_selected_content_down(self) -> None:
+        index = self._selected_content_index()
+        if index is not None:
+            self.move_content_page_down(index)
+
+    def _selected_content_index(self) -> int | None:
+        selection = self.content_list.curselection()
+        return selection[0] if selection else None
 
 
 def create_main_window() -> tk.Tk:
     root = tk.Tk()
     root.title(APP_TITLE)
     root.geometry(APP_GEOMETRY)
-    root.minsize(760, 520)
+    root.minsize(840, 620)
 
     _configure_styles(root)
-    _build_shell(root)
+    root.form = TrainingDocumentForm(root)
 
     return root
 
 
 def _configure_styles(root: tk.Tk) -> None:
     style = ttk.Style(root)
-    if "vista" in style.theme_names():
-        style.theme_use("vista")
-
     style.configure("App.TFrame", background="#f5f6f8")
     style.configure("Header.TLabel", background="#f5f6f8", font=("Segoe UI", 18, "bold"))
     style.configure("Body.TLabel", background="#f5f6f8", font=("Segoe UI", 10))
     style.configure("Status.TLabel", background="#eef1f5", font=("Segoe UI", 9))
-
-
-def _build_shell(root: tk.Tk) -> None:
-    root.columnconfigure(0, weight=1)
-    root.rowconfigure(0, weight=1)
-
-    frame = ttk.Frame(root, padding=24, style="App.TFrame")
-    frame.grid(row=0, column=0, sticky="nsew")
-    frame.columnconfigure(0, weight=1)
-    frame.rowconfigure(2, weight=1)
-
-    title = ttk.Label(frame, text=APP_TITLE, style="Header.TLabel")
-    title.grid(row=0, column=0, sticky="w")
-
-    subtitle = ttk.Label(
-        frame,
-        text="Training document skeleton generator",
-        style="Body.TLabel",
-    )
-    subtitle.grid(row=1, column=0, sticky="w", pady=(6, 20))
-
-    preview = tk.Text(frame, height=12, wrap="word", borderwidth=1, relief="solid")
-    preview.insert(
-        "1.0",
-        "Ticket 01 skeleton is ready.\n\n"
-        "Upcoming workflow:\n"
-        "1. Define the training document input model.\n"
-        "2. Generate a deterministic page plan.\n"
-        "3. Export a new PPTX skeleton.\n"
-        "4. Add table-of-contents navigation links.\n",
-    )
-    preview.configure(state="disabled")
-    preview.grid(row=2, column=0, sticky="nsew")
-
-    status = ttk.Label(
-        frame,
-        text="Ready",
-        anchor="w",
-        padding=(8, 4),
-        style="Status.TLabel",
-    )
-    status.grid(row=3, column=0, sticky="ew", pady=(16, 0))

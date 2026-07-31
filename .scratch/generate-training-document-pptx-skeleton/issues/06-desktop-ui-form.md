@@ -4,11 +4,11 @@
 
 **Blocked by:** 02 - Define Training Document Input Model.
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] The UI lets the user edit the PPT title.
-- [ ] The UI lets the user add, rename, remove, and reorder sections.
-- [ ] The UI lets the user add, rename, remove, and reorder content page titles within a section.
-- [ ] The UI shows validation messages from the input model.
-- [ ] The UI shows a readable preview of the planned slide structure.
-- [ ] The UI can preserve user-entered data while editing the form.
+- [x] The UI lets the user edit the PPT title.
+- [x] The UI lets the user add, rename, remove, and reorder sections.
+- [x] The UI lets the user add, rename, remove, and reorder content page titles within a section.
+- [x] The UI shows validation messages from the input model.
+- [x] The UI shows a readable preview of the planned slide structure.
+- [x] The UI can preserve user-entered data while editing the form.
