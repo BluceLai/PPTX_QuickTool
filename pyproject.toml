@@ -7,6 +7,11 @@ dependencies = [
     "python-pptx>=1.0.2",
 ]
 
+[project.optional-dependencies]
+build = [
+    "pyinstaller>=6.0",
+]
+
 [project.scripts]
 pptx-quicktool = "pptx_quicktool.__main__:main"
 

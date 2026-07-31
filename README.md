@@ -37,3 +37,19 @@ python scripts/build.py
 ```
 
 The build command writes a source archive under `dist/`.
+
+## Build A Windows EXE Release
+
+Install the build dependency once:
+
+```powershell
+python -m pip install -e .[build]
+```
+
+Then build the distributable zip:
+
+```powershell
+python scripts/build_exe.py
+```
+
+The build command writes `dist/PPTX_QuickTool_v0.1.0.zip`. Share that zip with coworkers. They can extract it and run `PPTX QuickTool/PPTX QuickTool.exe`.
