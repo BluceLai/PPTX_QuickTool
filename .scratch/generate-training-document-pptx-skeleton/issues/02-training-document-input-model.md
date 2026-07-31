@@ -4,12 +4,12 @@
 
 **Blocked by:** 01 - Establish Desktop Tool Project Skeleton.
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] The system can represent a document title.
-- [ ] The system can represent ordered sections.
-- [ ] Each section can represent ordered content page titles.
-- [ ] Validation rejects an empty document title.
-- [ ] Validation rejects empty section titles.
-- [ ] Validation rejects empty content page titles.
-- [ ] Validation returns clear messages that the UI can display.
+- [x] The system can represent a document title.
+- [x] The system can represent ordered sections.
+- [x] Each section can represent ordered content page titles.
+- [x] Validation rejects an empty document title.
+- [x] Validation rejects empty section titles.
+- [x] Validation rejects empty content page titles.
+- [x] Validation returns clear messages that the UI can display.
