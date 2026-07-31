@@ -47,6 +47,16 @@ def slide_combined_text(slide) -> str:
     return "\n".join(texts)
 
 
+def paragraph_with_text(slide, text: str):
+    for shape in slide.shapes:
+        if not hasattr(shape, "text_frame"):
+            continue
+        for paragraph in shape.text_frame.paragraphs:
+            if paragraph.text == text:
+                return paragraph
+    raise AssertionError(f"Could not find paragraph with text: {text}")
+
+
 def linked_slide_indices(presentation: Presentation, slide) -> list[int]:
     indices = []
     for shape in slide.shapes:
@@ -206,6 +216,31 @@ class PptxExporterTests(unittest.TestCase):
         self.assertNotIn("- 2", table_of_contents_text)
         self.assertNotIn("1. 測試1", section_text)
         self.assertNotIn("- 1", section_text)
+
+    def test_agenda_paragraphs_use_template_bullets_instead_of_auto_numbering(self) -> None:
+        document = TrainingDocumentInput(
+            title="測試文件",
+            sections=[
+                SectionInput(title="測試1", content_page_titles=["1", "2"]),
+                SectionInput(title="測試2", content_page_titles=["1", "2"]),
+            ],
+        )
+        plan = generate_page_plan(document)
+        output_dir = ROOT / ".tmp" / "test-output"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / "training-document-template-bullets.pptx"
+
+        export_page_plan_to_pptx(plan, output_path)
+
+        presentation = Presentation(output_path)
+        section_paragraph = paragraph_with_text(presentation.slides[1], "測試1")
+        content_paragraph = paragraph_with_text(presentation.slides[1], "1")
+
+        self.assertEqual(section_paragraph.level, 0)
+        self.assertEqual(content_paragraph.level, 1)
+        self.assertEqual(section_paragraph._p.pPr.xpath("./a:buAutoNum"), [])
+        self.assertEqual(content_paragraph._p.pPr.xpath("./a:buAutoNum"), [])
+        self.assertTrue(section_paragraph._p.pPr.xpath("./a:buChar"))
 
     def test_exports_reference_size_and_consistent_title_hierarchy(self) -> None:
         document = TrainingDocumentInput(

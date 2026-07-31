@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from copy import deepcopy
+from dataclasses import dataclass
 from pathlib import Path
 
 from pptx.dml.color import RGBColor
@@ -28,8 +30,15 @@ LAYOUT_NAMES_BY_PAGE_KIND = {
 }
 
 
+@dataclass(frozen=True)
+class TemplatePresentation:
+    presentation: Presentation
+    agenda_paragraph_styles: dict[int, object]
+
+
 def export_page_plan_to_pptx(plan: PagePlan, output_path: Path, template_path: Path | None = None) -> Path:
-    presentation = _new_presentation_from_template(template_path)
+    template = _new_presentation_from_template(template_path)
+    presentation = template.presentation
     slide_by_page_id = {}
     slide_pages = []
     for page in plan.pages:
@@ -39,21 +48,32 @@ def export_page_plan_to_pptx(plan: PagePlan, output_path: Path, template_path: P
 
     table_of_contents_slide = slide_by_page_id["table-of-contents"]
     for slide, page in slide_pages:
-        _populate_slide(slide, page, plan, slide_by_page_id, table_of_contents_slide)
+        _populate_slide(
+            slide,
+            page,
+            plan,
+            slide_by_page_id,
+            table_of_contents_slide,
+            template.agenda_paragraph_styles,
+        )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     presentation.save(output_path)
     return output_path
 
 
-def _new_presentation_from_template(template_path: Path | None):
+def _new_presentation_from_template(template_path: Path | None) -> TemplatePresentation:
     path = Path(template_path) if template_path is not None else DEFAULT_TEMPLATE_PATH
     if not path.exists():
         raise FileNotFoundError(f"Template PPTX was not found: {path}")
 
     presentation = Presentation(path)
+    agenda_paragraph_styles = _extract_agenda_paragraph_styles(presentation)
     _remove_all_slides(presentation)
-    return presentation
+    return TemplatePresentation(
+        presentation=presentation,
+        agenda_paragraph_styles=agenda_paragraph_styles,
+    )
 
 
 def _remove_all_slides(presentation) -> None:
@@ -72,12 +92,19 @@ def _layout_for_page(presentation, page: PlannedPage):
     return presentation.slide_layouts[0]
 
 
-def _populate_slide(slide, page: PlannedPage, plan: PagePlan, slide_by_page_id, table_of_contents_slide) -> None:
+def _populate_slide(
+    slide,
+    page: PlannedPage,
+    plan: PagePlan,
+    slide_by_page_id,
+    table_of_contents_slide,
+    agenda_paragraph_styles: dict[int, object],
+) -> None:
     _set_title(slide, page.title)
     if page.kind == "table_of_contents":
-        _populate_table_of_contents(slide, plan, slide_by_page_id)
+        _populate_table_of_contents(slide, plan, slide_by_page_id, agenda_paragraph_styles)
     elif page.kind == "section_start":
-        _populate_section_agenda(slide, page, plan, table_of_contents_slide)
+        _populate_section_agenda(slide, page, plan, table_of_contents_slide, agenda_paragraph_styles)
     elif page.kind == "content":
         _clear_body_placeholder(slide)
 
@@ -114,7 +141,7 @@ def _add_link_text(slide, text: str, left, top, width, height):
     return box
 
 
-def _populate_table_of_contents(slide, plan: PagePlan, slide_by_page_id) -> None:
+def _populate_table_of_contents(slide, plan: PagePlan, slide_by_page_id, agenda_paragraph_styles: dict[int, object]) -> None:
     body_shape = _placeholder(slide, PP_PLACEHOLDER.BODY)
     if body_shape is None:
         _add_table_of_contents_text_boxes(slide, plan, slide_by_page_id)
@@ -122,20 +149,27 @@ def _populate_table_of_contents(slide, plan: PagePlan, slide_by_page_id) -> None
 
     text_frame = body_shape.text_frame
     text_frame.clear()
-    _append_agenda_line(text_frame, TABLE_OF_CONTENTS_RETURN_TEXT)
+    _append_agenda_line(text_frame, TABLE_OF_CONTENTS_RETURN_TEXT, paragraph_styles=agenda_paragraph_styles)
     for entry in plan.table_of_contents_entries:
         run = _append_agenda_line(
             text_frame,
             entry.title,
             is_link=True,
+            paragraph_styles=agenda_paragraph_styles,
         )
         _link_run_to_slide(slide, run, slide_by_page_id[entry.target_page_id])
         section_page = _page_for_id(plan, entry.target_page_id)
         for content_title in _content_titles_for_section(plan, section_page):
-            _append_agenda_line(text_frame, content_title, level=1)
+            _append_agenda_line(text_frame, content_title, level=1, paragraph_styles=agenda_paragraph_styles)
 
 
-def _populate_section_agenda(slide, page: PlannedPage, plan: PagePlan, table_of_contents_slide) -> None:
+def _populate_section_agenda(
+    slide,
+    page: PlannedPage,
+    plan: PagePlan,
+    table_of_contents_slide,
+    agenda_paragraph_styles: dict[int, object],
+) -> None:
     body_shape = _placeholder(slide, PP_PLACEHOLDER.BODY)
     if body_shape is None:
         _add_return_link(slide, table_of_contents_slide)
@@ -144,15 +178,25 @@ def _populate_section_agenda(slide, page: PlannedPage, plan: PagePlan, table_of_
     current_section_index = _section_index_from_page_id(page.page_id)
     text_frame = body_shape.text_frame
     text_frame.clear()
-    run = _append_agenda_line(text_frame, TABLE_OF_CONTENTS_RETURN_TEXT, is_link=True)
+    run = _append_agenda_line(
+        text_frame,
+        TABLE_OF_CONTENTS_RETURN_TEXT,
+        is_link=True,
+        paragraph_styles=agenda_paragraph_styles,
+    )
     _link_run_to_slide(slide, run, table_of_contents_slide)
     for entry_index, entry in enumerate(plan.table_of_contents_entries, start=1):
         section_page = _page_for_id(plan, entry.target_page_id)
-        run = _append_agenda_line(text_frame, entry.title, is_current=entry_index == current_section_index)
+        run = _append_agenda_line(
+            text_frame,
+            entry.title,
+            is_current=entry_index == current_section_index,
+            paragraph_styles=agenda_paragraph_styles,
+        )
         if entry_index == current_section_index:
             run.font.bold = True
         for content_title in _content_titles_for_section(plan, section_page):
-            _append_agenda_line(text_frame, content_title, level=1)
+            _append_agenda_line(text_frame, content_title, level=1, paragraph_styles=agenda_paragraph_styles)
 
 
 def _add_table_of_contents_text_boxes(slide, plan: PagePlan, slide_by_page_id) -> None:
@@ -168,9 +212,17 @@ def _add_table_of_contents_text_boxes(slide, plan: PagePlan, slide_by_page_id) -
         link.click_action.target_slide = slide_by_page_id[entry.target_page_id]
 
 
-def _append_agenda_line(text_frame, text: str, level: int = 0, is_link: bool = False, is_current: bool = False):
+def _append_agenda_line(
+    text_frame,
+    text: str,
+    level: int = 0,
+    is_link: bool = False,
+    is_current: bool = False,
+    paragraph_styles: dict[int, object] | None = None,
+):
     paragraph = text_frame.paragraphs[0] if _is_empty_text_frame(text_frame) else text_frame.add_paragraph()
     paragraph.level = level
+    _apply_paragraph_style(paragraph, level, paragraph_styles or {})
     run = paragraph.add_run()
     run.text = text
     if is_link:
@@ -179,6 +231,66 @@ def _append_agenda_line(text_frame, text: str, level: int = 0, is_link: bool = F
     if is_current:
         run.font.bold = True
     return run
+
+
+def _extract_agenda_paragraph_styles(presentation: Presentation) -> dict[int, object]:
+    styles = _agenda_paragraph_styles_from_sample_slides(presentation)
+    fallback_styles = _agenda_paragraph_styles_from_master(presentation)
+    return {level: styles.get(level) or fallback_styles[level] for level in (0, 1) if level in styles or level in fallback_styles}
+
+
+def _agenda_paragraph_styles_from_sample_slides(presentation: Presentation) -> dict[int, object]:
+    styles = {}
+    for slide in presentation.slides:
+        if slide.slide_layout.name not in {"Contents", "Text"}:
+            continue
+        body_shape = _placeholder(slide, PP_PLACEHOLDER.BODY)
+        if body_shape is None:
+            continue
+        for paragraph in body_shape.text_frame.paragraphs:
+            if not paragraph.text.strip() or paragraph._p.pPr is None:
+                continue
+            level = paragraph.level or 0
+            styles.setdefault(level, deepcopy(paragraph._p.pPr))
+        if 0 in styles and 1 in styles:
+            return styles
+    return styles
+
+
+def _agenda_paragraph_styles_from_master(presentation: Presentation) -> dict[int, object]:
+    styles = {}
+    for master in presentation.slide_masters:
+        for level in (0, 1):
+            style = _master_body_level_style(master, level)
+            if style is not None:
+                styles.setdefault(level, style)
+    return styles
+
+
+def _master_body_level_style(master, level: int):
+    tag_name = f".//p:txStyles/p:bodyStyle/a:lvl{level + 1}pPr"
+    elements = master._element.xpath(tag_name)
+    if not elements:
+        return None
+    style = deepcopy(elements[0])
+    style.tag = qn("a:pPr")
+    if level > 0:
+        style.set("lvl", str(level))
+    return style
+
+
+def _apply_paragraph_style(paragraph, level: int, paragraph_styles: dict[int, object]) -> None:
+    style = paragraph_styles.get(level)
+    if style is None:
+        return
+    if paragraph._p.pPr is not None:
+        paragraph._p.remove(paragraph._p.pPr)
+    ppr = deepcopy(style)
+    if level > 0:
+        ppr.set("lvl", str(level))
+    elif "lvl" in ppr.attrib:
+        del ppr.attrib["lvl"]
+    paragraph._p.insert(0, ppr)
 
 
 def _is_empty_text_frame(text_frame) -> bool:
